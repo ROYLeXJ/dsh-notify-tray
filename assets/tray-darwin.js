@@ -97,9 +97,14 @@ function run(argv) {
       'tick:': {
         types: ['void', ['id']],
         implementation: function () {
-          if (!hostAlive()) { app.terminate(null); return }
-          var view = readView()
-          if (view) apply(view)
+          try {
+            if (!hostAlive()) { app.terminate(null); return }
+            var view = readView()
+            if (view) apply(view)
+          } catch (e) {
+            // ObjC callbacks swallow exceptions silently; surface them on stderr.
+            $.NSFileHandle.fileHandleWithStandardError.writeData($('tray tick failed: ' + e + '\n').dataUsingEncoding($.NSUTF8StringEncoding))
+          }
         },
       },
     },
