@@ -1,0 +1,6 @@
+# dsh-notify-tray bundle patch: mount the host half (state tracking, ledger,
+# tray helper, system-notification fallback). The browser half is discovered
+# through package.json `dsh.client` + exports["./client"].
+- insert:
+    - id: notify-tray
+      name: 'dsh-notify-tray'
