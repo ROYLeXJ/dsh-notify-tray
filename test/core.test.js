@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildView, money } from '../lib/format.js'
-import { glyphOf, renderIcon } from '../lib/icon.js'
+import { buildView, elapsed, money } from '../lib/format.js'
+import { asciiIcon, renderIcon } from '../lib/icon.js'
+import { flatten, iconSpec, whaleFrames, whalePaths, whaleSvg } from '../lib/whale.js'
 import { Ledger, priceFor } from '../lib/ledger.js'
 import { classifyQuestion, Tracker } from '../lib/tracker.js'
 
@@ -25,6 +26,9 @@ test('tracker emits events and counts outcomes for top-level sessions only', () 
 
   t.agentStatus(agent('s1'), 'running')
   t.sessionEvent(s, ev('session/title', { title: '重构登录' }))
+  t.sessionEvent(s, ev('tool/call', { callId: 't0', name: 'bash', arguments: '{}' }))
+  assert.equal(t.summary().runningList[0].tool, 'bash')
+  assert.equal(typeof t.summary().runningList[0].since, 'number')
   t.sessionEvent(s, ev('approval/asked', { id: 'ap1', toolName: 'bash', reason: '运行 rm -rf build' }))
   assert.equal(t.summary().waiting.length, 1)
   t.sessionEvent(s, ev('approval/decided', { id: 'ap1', outcome: 'allowed-once' }))
@@ -83,22 +87,41 @@ test('priceFor matches exact id then longest prefix', () => {
   assert.equal(priceFor(table, 'gpt'), undefined)
 })
 
-test('view: attention beats running; title carries counts and spend', () => {
+test('view: attention beats running; title says what needs you, never money', () => {
+  const now = 1_000_000
   const tasks = {
     running: 2,
-    runningList: [{ sessionId: 'a', title: 'A' }, { sessionId: 'b', title: 'B' }],
+    runningList: [{ sessionId: 'a', title: 'A', since: now - 7 * 60_000, tool: 'bash' }, { sessionId: 'b', title: 'B', since: now }],
     waiting: [{ sessionId: 'a', title: 'A', kind: 'input', text: '名字？', since: 1 }],
-    recent: [],
+    recent: [{ sessionId: 'c', title: 'C', kind: 'completed', at: now - 60_000 }],
     today: { completed: 3, failed: 0, aborted: 0 },
   }
-  const usage = { tokens: { input: 1, cacheRead: 0, cacheWrite: 0, output: 1, total: 2 }, balance: 98.7, balanceSpend: 1.234, currency: 'CNY' }
-  const v = buildView(tasks, usage, { spendSource: 'auto', showSpendInTitle: true })
+  const usage = { tokens: { input: 1, cacheRead: 0, cacheWrite: 0, output: 1, total: 2 }, balance: 98.7, balanceSpend: 1.234, currency: 'CNY', usageUrl: 'https://x' }
+  const v = buildView(tasks, usage, { spendSource: 'auto' }, now)
   assert.equal(v.state, 'attention')
-  assert.equal(v.title, '⚠1 ▶2 ¥1.23')
+  assert.equal(v.title, '待处理 1')
   assert.equal(v.badge, '1')
+  assert.equal(v.menu[0].label, '有 1 件事等你处理')
   assert.ok(v.tooltip.includes('账户余额 ¥98.7'))
-  assert.ok(v.menu.some(row => row.id === 'open:a'))
-  assert.ok(v.menu.some(row => row.id === 'open:b'))
+  const labels = v.menu.filter(r => !r.separator).map(r => r.label)
+  assert.ok(labels.some(l => l.startsWith('待输入 · A：名字？')))
+  assert.ok(labels.includes('B · 刚开始'))
+  assert.ok(!labels.some(l => l.includes('A · 7 分钟')), 'a waiting session is not listed twice')
+  const today = v.menu.find(r => r.id === 'today')
+  assert.equal(today.label, '今日用量 · ¥1.23')
+  assert.ok(today.children.some(r => r.id === 'usage-page'))
+  assert.ok(today.children.some(r => r.label === '账户余额 ¥98.7'))
+  assert.ok(v.menu.find(r => r.id === 'recent').children.some(r => r.id === 'open:c'))
+  assert.ok(!v.tooltip.includes('undefined'))
+
+  // Title styles.
+  const running = { ...tasks, waiting: [] }
+  assert.equal(buildView(running, usage, {}, now).title, '运行中 2')
+  assert.equal(buildView(running, usage, { titleStyle: 'count' }, now).title, '2')
+  assert.equal(buildView(running, usage, { titleStyle: 'icon' }, now).title, '')
+  assert.equal(buildView(running, usage, { showSpendInTitle: true }, now).title, '运行中 2 · ¥1.23')
+  assert.equal(buildView({ ...running, running: 0, runningList: [] }, usage, {}, now).title, '')
+  assert.equal(elapsed(now - 90 * 60_000, now), '1 小时 30 分')
   assert.equal(money(12.345, 'USD'), '$12.3')
 })
 
@@ -111,12 +134,25 @@ test('view: recent failure shows error, idle otherwise', () => {
   assert.equal(buildView(failed, usage, { errorHoldMinutes: 10 }, now + 11 * 60_000).state, 'idle')
 })
 
-test('icon renders ARGB with transparent corners and white glyph', () => {
-  const size = 22
-  const px = renderIcon(size, 'running', '3')
+test('whale: every state has geometry, running animates, holes cut through', () => {
+  const spec = iconSpec()
+  assert.deepEqual(Object.keys(spec.frames), ['idle', 'running', 'attention', 'error'])
+  assert.equal(whaleFrames('running').length, 2)
+  assert.equal(whaleFrames('idle').length, 1)
+  assert.ok(whalePaths('attention').length > whalePaths('idle').length)
+  assert.ok(flatten(whalePaths('idle')).every(poly => poly.length > 2))
+  assert.ok(whaleSvg({ state: 'error' }).startsWith('<svg'))
+
+  const size = 32
+  const px = renderIcon(size, 'running')
   assert.equal(px.length, size * size * 4)
-  assert.equal(px[0], 0) // corner alpha
-  const center = (11 * size + 11) * 4
-  assert.equal(px[center], 255)
-  assert.equal(glyphOf({ state: 'error', badge: '' }), '!')
+  assert.equal(px[0], 0, 'corner is transparent')
+  const art = asciiIcon(size, 'idle').split('\n')
+  assert.equal(art.length, size)
+  assert.ok(art.some(row => row.includes('#')), 'body is filled')
+  // The eye is a hole: a transparent pixel surrounded by opaque ones inside the head.
+  const eyeRow = art.find(row => /#+ {2,}#+/u.test(row))
+  assert.ok(eyeRow, 'eye hole present')
+  // Unknown states fall back to the idle whale instead of throwing.
+  assert.equal(renderIcon(16, 'nope').length, 16 * 16 * 4)
 })

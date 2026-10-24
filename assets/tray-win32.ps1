@@ -24,40 +24,63 @@ function Send-Action([string]$Id) {
   $stdout.Flush()
 }
 
-$colors = @{
-  attention = [System.Drawing.Color]::FromArgb(255, 245, 140, 30)
-  error     = [System.Drawing.Color]::FromArgb(255, 224, 49, 49)
-  running   = [System.Drawing.Color]::FromArgb(255, 77, 107, 254)
-  idle      = [System.Drawing.Color]::FromArgb(255, 46, 160, 90)
+# The icon is the whale from lib/whale.js, shipped inside view.json as bezier
+# paths (`view.icon`) and drawn here with GDI+ in the state colour.
+$script:iconSpec = $null
+$script:iconCache = @{}
+
+function New-WhalePath($Paths, $Spec, [int]$W, [int]$H) {
+  $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $path.FillMode = [System.Drawing.Drawing2D.FillMode]::Winding
+  $b = $Spec.bounds
+  if ($null -eq $b) { $b = @{ x = 0; y = 0; w = $Spec.box; h = $Spec.box } }
+  $s = [Math]::Min($W / [double]$b.w, $H / [double]$b.h)
+  $ox = ($W - $b.w * $s) / 2
+  $oy = ($H - $b.h * $s) / 2
+  foreach ($sub in $Paths) {
+    $cur = $null
+    $path.StartFigure()
+    foreach ($cmd in $sub) {
+      switch ($cmd[0]) {
+        'M' { $cur = New-Object System.Drawing.PointF(($ox + ($cmd[1] - $b.x) * $s), ($oy + ($cmd[2] - $b.y) * $s)) }
+        'L' {
+          $to = New-Object System.Drawing.PointF(($ox + ($cmd[1] - $b.x) * $s), ($oy + ($cmd[2] - $b.y) * $s))
+          $path.AddLine($cur, $to); $cur = $to
+        }
+        'C' {
+          $c1 = New-Object System.Drawing.PointF(($ox + ($cmd[1] - $b.x) * $s), ($oy + ($cmd[2] - $b.y) * $s))
+          $c2 = New-Object System.Drawing.PointF(($ox + ($cmd[3] - $b.x) * $s), ($oy + ($cmd[4] - $b.y) * $s))
+          $to = New-Object System.Drawing.PointF(($ox + ($cmd[5] - $b.x) * $s), ($oy + ($cmd[6] - $b.y) * $s))
+          $path.AddBezier($cur, $c1, $c2, $to); $cur = $to
+        }
+        'Z' { $path.CloseFigure() }
+      }
+    }
+  }
+  return $path
 }
 
-$script:lastIcon = $null
-function New-StateIcon([string]$State, [string]$Badge) {
+function New-StateIcon([string]$State, [int]$Frame) {
   $size = [System.Windows.Forms.SystemInformation]::SmallIconSize.Width
   if ($size -lt 16) { $size = 16 }
+  $spec = $script:iconSpec
   $bmp = New-Object System.Drawing.Bitmap($size, $size)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
-  $color = $colors[$State]
-  if ($null -eq $color) { $color = $colors['idle'] }
-  $brush = New-Object System.Drawing.SolidBrush($color)
-  $g.FillEllipse($brush, 0, 0, $size - 1, $size - 1)
-  $glyph = $Badge
-  if ([string]::IsNullOrEmpty($glyph)) {
-    if ($State -eq 'error') { $glyph = '!' } else { $glyph = '' }
-  }
-  if ($glyph -ne '') {
-    $font = New-Object System.Drawing.Font('Segoe UI', [single]($size * 0.62), [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $fmt = New-Object System.Drawing.StringFormat
-    $fmt.Alignment = [System.Drawing.StringAlignment]::Center
-    $fmt.LineAlignment = [System.Drawing.StringAlignment]::Center
-    $rect = New-Object System.Drawing.RectangleF(0, 0, $size, $size)
-    $g.DrawString($glyph, $font, [System.Drawing.Brushes]::White, $rect, $fmt)
-    $font.Dispose()
+  $g.Clear([System.Drawing.Color]::Transparent)
+  $rgb = $null
+  if ($spec -and $spec.rgb.$State) { $rgb = $spec.rgb.$State }
+  if ($null -eq $rgb) { $rgb = @(59, 83, 170) }
+  $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, [int]$rgb[0], [int]$rgb[1], [int]$rgb[2]))
+  if ($spec -and $spec.frames.$State) {
+    $frames = $spec.frames.$State
+    $paths = $frames[$Frame % $frames.Count]
+    $path = New-WhalePath $paths $spec $size $size
+    $g.FillPath($brush, $path)
+    $path.Dispose()
   } else {
-    # Idle: a small white tick-like dot so the icon is not a blank disc.
-    $g.FillEllipse([System.Drawing.Brushes]::White, [int]($size * 0.35), [int]($size * 0.35), [int]($size * 0.3), [int]($size * 0.3))
+    # No geometry yet (first view): a plain disc keeps the icon visible.
+    $g.FillEllipse($brush, 1, 1, $size - 3, $size - 3)
   }
   $brush.Dispose()
   $g.Dispose()
@@ -68,11 +91,17 @@ function New-StateIcon([string]$State, [string]$Badge) {
   return $icon
 }
 
+function Get-StateIcon([string]$State, [int]$Frame) {
+  $key = "$State`:$Frame"
+  if (-not $script:iconCache.ContainsKey($key)) { $script:iconCache[$key] = New-StateIcon $State $Frame }
+  return $script:iconCache[$key]
+}
+
 Add-Type -Namespace 'DshTray' -Name 'Win32Icon' -MemberDefinition '[DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);'
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Text = 'DeepSeek Harness'
-$notify.Icon = New-StateIcon 'idle' ''
+$notify.Icon = Get-StateIcon 'idle' 0
 $notify.Visible = $true
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $notify.ContextMenuStrip = $menu
@@ -86,29 +115,42 @@ $notify.add_BalloonTipClicked({
   if ($script:balloonAction) { Send-Action $script:balloonAction }
 })
 
-function Set-Menu($rows) {
-  $menu.Items.Clear()
+$menuClick = {
+  param($sender, $e)
+  $id = [string]$sender.Tag
+  if ($id -eq '') { return }
+  Send-Action $id
+  if ($id -eq 'hide-tray') { $notify.Visible = $false; [System.Windows.Forms.Application]::Exit() }
+}
+
+function Add-MenuRows($items, $rows) {
   foreach ($row in $rows) {
     if ($row.separator) {
-      [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+      [void]$items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
       continue
     }
     $mi = New-Object System.Windows.Forms.ToolStripMenuItem($row.label)
-    $mi.Tag = $row.id
-    if ($row.enabled -eq $false) { $mi.Enabled = $false }
-    $mi.add_Click({
-      param($sender, $e)
-      $id = [string]$sender.Tag
-      Send-Action $id
-      if ($id -eq 'hide-tray') { $notify.Visible = $false; [System.Windows.Forms.Application]::Exit() }
-    })
-    [void]$menu.Items.Add($mi)
+    if ($row.children -and $row.children.Count -gt 0) {
+      Add-MenuRows $mi.DropDownItems $row.children
+    } else {
+      $mi.Tag = $row.id
+      if ($row.enabled -eq $false) { $mi.Enabled = $false }
+      $mi.add_Click($menuClick)
+    }
+    [void]$items.Add($mi)
   }
+}
+
+function Set-Menu($rows) {
+  $menu.Items.Clear()
+  Add-MenuRows $menu.Items $rows
 }
 
 $script:lastStamp = ''
 $script:lastToast = 0
-$script:lastIconKey = ''
+$script:state = 'idle'
+$script:frame = 0
+$script:frameCount = 1
 
 function Update-FromView {
   if (-not (Test-Path -LiteralPath $ViewPath)) { return }
@@ -120,13 +162,17 @@ function Update-FromView {
     $view = [System.IO.File]::ReadAllText($ViewPath, $utf8) | ConvertFrom-Json
   } catch { return }
 
-  $iconKey = "$($view.state):$($view.badge)"
-  if ($iconKey -ne $script:lastIconKey) {
-    $old = $notify.Icon
-    $notify.Icon = New-StateIcon ([string]$view.state) ([string]$view.badge)
-    if ($old) { $old.Dispose() }
-    $script:lastIconKey = $iconKey
+  if ($view.icon) {
+    $script:iconSpec = $view.icon
+    $script:iconCache = @{}
   }
+  $script:state = [string]$view.state
+  $script:frame = 0
+  $script:frameCount = 1
+  if ($script:iconSpec -and $script:iconSpec.frames.($script:state)) {
+    $script:frameCount = $script:iconSpec.frames.($script:state).Count
+  }
+  $notify.Icon = Get-StateIcon $script:state 0
   # .NET Framework caps NotifyIcon.Text at 63 characters.
   $tip = [string]$view.tooltip
   if ($tip.Length -gt 63) { $tip = $tip.Substring(0, 62) + [char]0x2026 }
@@ -148,7 +194,7 @@ function Test-HostAlive {
 }
 
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 500
+$timer.Interval = 600
 $timer.add_Tick({
   try {
     if (-not (Test-HostAlive)) {
@@ -157,6 +203,11 @@ $timer.add_Tick({
       return
     }
     Update-FromView
+    # Spout animation: swap frames every tick (600 ms) while the state animates.
+    if ($script:frameCount -gt 1) {
+      $script:frame = ($script:frame + 1) % $script:frameCount
+      $notify.Icon = Get-StateIcon $script:state $script:frame
+    }
   } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
   }

@@ -3,19 +3,26 @@
 DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、Linux（含 UOS、Deepin、银河麒麟）。
 
 - **系统通知**：任务完成、任务失败、需要批准、需要你选择、需要你输入时弹系统通知。点击通知会跳到对应会话。
-- **状态栏小图标**：常驻显示运行中的任务数、等你处理的任务数、今日完成/失败数、今日花费、账户余额和今日 Token 用量。点击菜单里的会话可以直接跳过去。
+- **状态栏小鲸鱼**：常驻一只戴女仆帽的 Q 版小鲸鱼，用姿态告诉你现在的状态；下拉菜单里是正在运行的任务（标题、已运行多久、正在用什么工具）、等你处理的事项，以及今日用量和最近结束的任务，点一下就能跳到对应会话。
+
+![四种状态](assets/preview.svg)
+
+| 鲸鱼的样子 | 含义 |
+|---|---|
+| 安静地待着 | 空闲 |
+| 喷水（会动） | 有任务在运行 |
+| 面前冒出 `!` | 有事等你处理（批准 / 选择 / 输入） |
+| 面前冒出 `×` | 刚有任务失败（默认保持 10 分钟） |
+
+鲸鱼完全由代码画出来（`lib/whale.js` 里的贝塞尔曲线），三个平台都用同一份几何数据渲染，没有任何图片文件。macOS 上它是菜单栏模板图标，颜色自动跟随菜单栏（深色壁纸上是白色，浅色上是黑色），旁边只显示 `待处理 1` / `运行中 2` 这样的文字，不显示金额；Windows / Linux 的托盘图标用颜色区分状态（🔵 空闲/运行中、🟠 等你处理、🔴 刚失败）。
 
 不需要编译任何原生程序，三个平台都只用系统自带的能力：
 
 | 平台 | 状态栏 | 系统通知 |
 |---|---|---|
-| macOS | JXA 脚本（`osascript`）驱动 NSStatusItem。菜单栏直接显示文字，例如 `⚠1 ▶2 ¥1.23` | DSH 窗口内的原生通知；没有窗口时用 `osascript` |
-| Windows | 系统自带的 PowerShell 5.1 + WinForms NotifyIcon。图标颜色和数字表示状态，悬停显示摘要 | DSH 窗口内的原生通知；没有窗口时用托盘气泡（在 Win10/11 上显示为 Toast） |
-| Linux | 纯 JS 的 D-Bus（`dbus-next`）实现 StatusNotifierItem 协议。适用于 x86_64、ARM64（鲲鹏、飞腾）、LoongArch 等各种 CPU | `org.freedesktop.Notifications`（可点击），没有时退回 `notify-send` |
-
-> Windows 和 Linux 的系统托盘图标只能显示图标，不能显示文字，这是操作系统的限制。所以这两个平台用颜色和数字表示状态，详细信息在悬停提示和右键菜单里。
->
-> 图标颜色：🟠 等你处理　🔴 刚失败　🔵 运行中　🟢 空闲
+| macOS | JXA 脚本（`osascript`）驱动 NSStatusItem，用 NSBezierPath 画鲸鱼，菜单带 SF Symbols 图标和子菜单 | DSH 窗口内的原生通知；没有窗口时用 `osascript` |
+| Windows | 系统自带的 PowerShell 5.1 + WinForms NotifyIcon，用 GDI+ 画鲸鱼，悬停显示摘要 | DSH 窗口内的原生通知；没有窗口时用托盘气泡（在 Win10/11 上显示为 Toast） |
+| Linux | 纯 JS 的 D-Bus（`dbus-next`）实现 StatusNotifierItem 协议，鲸鱼由内置的软件光栅器画成像素图。适用于 x86_64、ARM64（鲲鹏、飞腾）、LoongArch 等各种 CPU | `org.freedesktop.Notifications`（可点击），没有时退回 `notify-send` |
 
 ## 安装
 
@@ -48,7 +55,8 @@ dsh plugin --profile web add /path/to/dsh-notify-tray
 | `channel` | `auto` | `auto`：有 DSH 窗口时由窗口弹，没有窗口时由系统弹 |
 | `suppressWhenFocused` | `true` | 你正在看这个会话时不弹通知 |
 | `tray` | `true` | 是否显示状态栏图标（修改后重启生效） |
-| `showSpendInTitle` | `true` | macOS 菜单栏文字里显示今日花费 |
+| `titleStyle` | `text` | macOS 菜单栏鲸鱼旁边显示什么：`text`（待处理 1 / 运行中 2）、`count`（只有数字）、`icon`（只有鲸鱼） |
+| `showSpendInTitle` | `false` | macOS 菜单栏文字里附带今日花费 |
 | `spendSource` | `auto` | 有 DeepSeek 账户余额时用余额扣费，否则用价格表估算 |
 | `currency` | `CNY` | 显示币种 |
 | `balancePollMinutes` | `5` | 账户余额刷新间隔（分钟）。每轮任务结束后 5 秒也会额外刷新一次 |
@@ -84,6 +92,7 @@ DSH 宿主进程（lib/index.js）
 ```sh
 npm install
 npm test                         # 单元测试 + 宿主端到窗口端的集成测试
+node scripts/render-icons.mjs    # 改过 lib/whale.js 后重新生成 icon.svg 和 assets/preview.svg
 DBUS_CONFIG=... node scripts/sni-smoke.mjs   # Linux 托盘协议冒烟测试（macOS 需先 brew install dbus）
 DSH_NOTIFY_TRAY_DEBUG=1 dsh ...  # 把收到的事件记到 storages/dsh-notify-tray/debug.log
 ```
