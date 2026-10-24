@@ -66,8 +66,11 @@ function run(argv) {
         button.imagePosition = $.NSImageLeft
       }
     }
+    // Never assign a JS `null` here: JXA bridges it to something that is not an
+    // NSColor and AppKit throws NSInvalidArgumentException while drawing the
+    // button, killing the helper on every idle view. $() is a real nil.
     var color = colors[view.state]
-    button.contentTintColor = color ? color : null
+    button.contentTintColor = color ? color : $()
     button.toolTip = $(view.tooltip)
 
     var menu = $.NSMenu.alloc.init
