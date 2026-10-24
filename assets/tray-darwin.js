@@ -15,9 +15,9 @@ ObjC.import('Cocoa')
 ObjC.import('stdlib')
 ObjC.import('signal')
 
-/** Icon size in points: menu-bar template height, a touch wider for the whale. */
-var ICON_H = 18
-var ICON_W = 21
+/** Icon size in points: the whale is wider than tall, so 22×16 sits like an 18 pt template icon. */
+var ICON_H = 16
+var ICON_W = 22
 /** Seconds between animation frames while a state animates (running = spout). */
 var FRAME_SECONDS = 0.6
 

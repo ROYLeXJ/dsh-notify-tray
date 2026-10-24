@@ -9,7 +9,7 @@ import { BOUNDS, STATE_RGB, toSvgPath, whalePaths, whaleSvg } from '../lib/whale
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 // Plugin icon: white whale on the brand tile, with the cap band showing the tile colour.
-writeFileSync(join(root, 'icon.svg'), whaleSvg({ state: 'idle', size: 64, fill: '#fff', background: '#4D6BFE', padding: 10 }))
+writeFileSync(join(root, 'icon.svg'), whaleSvg({ state: 'idle', size: 64, fill: '#fff', background: '#4D6BFE', padding: 12 }))
 
 // README preview: the four states (running shows frame 0) with their tints.
 const states = [['idle', '空闲'], ['running', '运行中'], ['attention', '等你处理'], ['error', '刚失败']]
@@ -18,7 +18,7 @@ let x = 0
 let body = ''
 for (const [state, label] of states) {
   const [r, g, b] = STATE_RGB[state]
-  body += `<g transform="translate(${x + 10} 10)"><path transform="scale(1)" d="${toSvgPath(whalePaths(state))}" fill="rgb(${r},${g},${b})"/></g>`
+  body += `<g transform="translate(${x + 10} ${10 + (100 - BOUNDS.h) / 2})"><path d="${toSvgPath(whalePaths(state))}" fill="rgb(${r},${g},${b})"/></g>`
   body += `<text x="${x + 60}" y="112" text-anchor="middle" font-family="-apple-system, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#555">${label}</text>`
   x += cell
 }
