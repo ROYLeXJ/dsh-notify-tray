@@ -2,7 +2,7 @@
 
 DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、Linux（含 UOS、Deepin、银河麒麟）。
 
-- **系统通知**：任务完成、任务失败、需要批准、需要你选择、需要你输入时弹系统通知。点击通知会跳到对应会话。
+- **系统通知**：任务完成、任务失败、需要批准、需要你选择、需要你输入时弹系统通知，文案是小鲸鱼自己的口吻（`lib/voice.js`，每类好几句轮换，比如「🐳 搞定啦～『写周报』做完了！快来验收」「🐳 该你拍板啦 『重构登录』遇到岔路口了：用哪个库？」）。点击通知会跳到对应会话。
 - **状态栏小鲸鱼**：常驻一只 DeepSeek Harness 的小鲸鱼（和 App 图标同款，蜷成一圈、尾巴扬在脑后），用姿态告诉你现在的状态；下拉菜单里是正在运行的任务（标题、已运行多久、正在用什么工具）、等你处理的事项，以及今日用量和最近结束的任务，点一下就能跳到对应会话。
 
 ![四种状态](assets/preview.svg)
@@ -53,7 +53,7 @@ dsh plugin --profile web add /path/to/dsh-notify-tray
 |---|---|---|
 | `notifyCompleted` / `notifyFailed` / `notifyApproval` / `notifyChoice` / `notifyInput` | 全部开启 | 分别控制五类通知 |
 | `channel` | `auto` | `auto`：有 DSH 窗口时由窗口弹，没有窗口时由系统弹 |
-| `suppressWhenFocused` | `true` | 你正在看这个会话时不弹通知 |
+| `suppressWhenFocused` | `true` | 你正在看这个会话时不弹通知（所以盯着窗口等它跑完是看不到通知的，切到别的应用去就有了） |
 | `tray` | `true` | 是否显示状态栏图标（修改后重启生效） |
 | `titleStyle` | `text` | macOS 菜单栏鲸鱼旁边显示什么：`text`（待处理 1 / 运行中 2）、`count`（只有数字）、`icon`（只有鲸鱼） |
 | `showSpendInTitle` | `false` | macOS 菜单栏文字里附带今日花费 |

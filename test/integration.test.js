@@ -84,8 +84,11 @@ test('host route feeds client notifications and click opens the session', async 
   ctx.emit('session/event', session, { type: 'turn/end', data: { turn: 2, reason: { kind: 'error', error: { message: '网络错误' } } } })
 
   await tick()
-  assert.deepEqual([...shown.map(n => n.title)], ['🔘 需要你选择 · 写周报', '✅ 任务完成 · 写周报', '❌ 任务失败 · 写周报'], 'input disabled by config')
-  assert.equal(shown[2].opts.body, '网络错误')
+  // Wording comes from lib/voice.js (the whale speaks); every line names the session.
+  assert.deepEqual(shown.map(n => n.title.startsWith('🐳 ')), [true, true, true], 'input disabled by config')
+  assert.ok(shown.every(n => n.opts.body.includes('『写周报』')))
+  assert.equal(shown.length, 3)
+  assert.ok(shown[2].opts.body.includes('网络错误'))
 
   // No duplicates on the next poll; a click opens the session.
   await tick()

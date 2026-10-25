@@ -124,7 +124,7 @@ function run(argv) {
     if (symbolCache[name] !== undefined) return symbolCache[name]
     var image = null
     if ($.NSImage.imageWithSystemSymbolNameAccessibilityDescription) {
-      var candidate = $.NSImage.imageWithSystemSymbolNameAccessibilityDescription(name, $())
+      var candidate = $.NSImage.imageWithSystemSymbolNameAccessibilityDescription(name, name)
       if (candidate && !candidate.isNil()) image = candidate
     }
     symbolCache[name] = image
