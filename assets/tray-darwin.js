@@ -167,6 +167,7 @@ function run(argv) {
   }
 
   function apply(view) {
+    if (view.quit) { app.terminate(null); return } // the host is taking the icon down
     if (view.icon) { icon = view.icon; images = {} } // legacy: geometry inline
     if (!icon) icon = readIcon()
     var frames = (icon && icon.frames[view.state]) ? icon.frames[view.state].length : 1

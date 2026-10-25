@@ -1,11 +1,14 @@
 // Smoke-test the Linux StatusNotifierItem + dbusmenu export against a private
-// dbus-daemon (works on macOS with `brew install dbus`). Plays the panel's role:
-// a fake StatusNotifierWatcher, then reads the item and clicks a menu row.
+// dbus-daemon (works on macOS with `brew install dbus`; the bundled
+// dbus-session.conf avoids the launchd-only session config there). Plays the
+// panel's role: a fake StatusNotifierWatcher, then reads the item and clicks a menu row.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 
-const daemon = spawn('dbus-daemon', [process.env.DBUS_CONFIG ? `--config-file=${process.env.DBUS_CONFIG}` : '--session', '--nofork', '--print-address'], { stdio: ['ignore', 'pipe', 'inherit'] })
+const config = process.env.DBUS_CONFIG ?? fileURLToPath(new URL('./dbus-session.conf', import.meta.url))
+const daemon = spawn('dbus-daemon', [`--config-file=${config}`, '--nofork', '--print-address'], { stdio: ['ignore', 'pipe', 'inherit'] })
 const [chunk] = await once(daemon.stdout, 'data')
 process.env.DBUS_SESSION_BUS_ADDRESS = String(chunk).trim()
 

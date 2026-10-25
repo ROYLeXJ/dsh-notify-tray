@@ -12,6 +12,14 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -Namespace 'DshTray' -Name 'Win32' -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
+[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+'@
+# Declare (system) DPI awareness before the first window handle exists, so
+# SmallIconSize reports the real, scaled tray icon size and the whale is drawn
+# at that size instead of being stretched blurry on 125-200 % displays.
+try { [void][DshTray.Win32]::SetProcessDPIAware() } catch {}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -93,7 +101,7 @@ function New-StateIcon([string]$State, [int]$Frame) {
   $g.Dispose()
   $handle = $bmp.GetHicon()
   $icon = [System.Drawing.Icon]::FromHandle($handle).Clone()
-  [void][DshTray.Win32Icon]::DestroyIcon($handle)
+  [void][DshTray.Win32]::DestroyIcon($handle)
   $bmp.Dispose()
   return $icon
 }
@@ -104,8 +112,7 @@ function Get-StateIcon([string]$State, [int]$Frame) {
   return $script:iconCache[$key]
 }
 
-Add-Type -Namespace 'DshTray' -Name 'Win32Icon' -MemberDefinition '[DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);'
-
+$script:iconSpec = Read-IconSpec
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Text = 'DeepSeek Harness'
 $notify.Icon = Get-StateIcon 'idle' 0
@@ -136,7 +143,7 @@ function Add-MenuRows($items, $rows) {
       [void]$items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
       continue
     }
-    $mi = New-Object System.Windows.Forms.ToolStripMenuItem($row.label)
+    $mi = New-Object System.Windows.Forms.ToolStripMenuItem(([string]$row.label).Replace('&', '&&'))
     if ($row.children -and $row.children.Count -gt 0) {
       Add-MenuRows $mi.DropDownItems $row.children
     } else {
@@ -148,13 +155,21 @@ function Add-MenuRows($items, $rows) {
   }
 }
 
+$script:pendingMenu = $null
 function Set-Menu($rows) {
+  # Rebuilding the strip while it is open would yank it out from under the
+  # pointer (views refresh every few seconds while a task runs): defer instead.
+  if ($menu.Visible) { $script:pendingMenu = @{ rows = $rows }; return }
+  $script:pendingMenu = $null
   $menu.Items.Clear()
   Add-MenuRows $menu.Items $rows
 }
+$menu.add_Closed({
+  if ($script:pendingMenu) { Set-Menu $script:pendingMenu.rows }
+})
 
 $script:lastStamp = ''
-$script:lastToast = 0
+$script:lastToast = [long]0
 $script:state = ''
 $script:frame = 0
 $script:frameCount = 1
@@ -172,8 +187,19 @@ function Update-FromView {
     $view = [System.IO.File]::ReadAllText($ViewPath, $utf8) | ConvertFrom-Json
   } catch { return }
 
+  if ($view.quit) {
+    # The host is shutting the icon down: leave cleanly instead of being killed
+    # (a terminated process leaves a ghost icon until the mouse passes over it).
+    $notify.Visible = $false
+    [System.Windows.Forms.Application]::Exit()
+    return
+  }
   if ($view.icon) { $script:iconSpec = $view.icon; $script:iconCache = @{} }
-  if ($null -eq $script:iconSpec) { $script:iconSpec = Read-IconSpec }
+  if ($null -eq $script:iconSpec) {
+    $script:iconSpec = Read-IconSpec
+    # Anything drawn before the geometry arrived was a placeholder disc.
+    if ($script:iconSpec) { $script:iconCache = @{}; $script:state = '' }
+  }
   $state = [string]$view.state
   if ($state -ne $script:state) {
     # A new state restarts its animation; the same state keeps playing.
@@ -190,16 +216,21 @@ function Update-FromView {
     }
     $notify.Icon = Get-StateIcon $state 0
   }
-  # .NET Framework caps NotifyIcon.Text at 63 characters.
-  $tip = [string]$view.tooltip
-  if ($tip.Length -gt 63) { $tip = $tip.Substring(0, 62) + [char]0x2026 }
+  # .NET Framework caps NotifyIcon.Text at 63 characters: keep whole lines,
+  # dropping from the bottom, rather than cutting a line in half.
+  $tip = ''
+  foreach ($line in ([string]$view.tooltip) -split "\n") {
+    $next = if ($tip -eq '') { $line } else { "$tip`n$line" }
+    if ($next.Length -gt 63) { if ($tip -eq '') { $tip = $line.Substring(0, 62) + [char]0x2026 }; break }
+    $tip = $next
+  }
   $notify.Text = $tip
   Set-Menu $view.menu
 
   # Host-side notifications on Windows ride the tray icon's balloon, which
   # Windows 10/11 renders as a native toast.
-  if ($view.toast -and [int]$view.toast.seq -gt $script:lastToast) {
-    $script:lastToast = [int]$view.toast.seq
+  if ($view.toast -and [long]$view.toast.seq -gt $script:lastToast) {
+    $script:lastToast = [long]$view.toast.seq
     $script:balloonAction = [string]$view.toast.action
     $notify.ShowBalloonTip(8000, [string]$view.toast.title, [string]$view.toast.body, [System.Windows.Forms.ToolTipIcon]::Info)
   }
@@ -210,11 +241,13 @@ function Test-HostAlive {
   return $null -ne (Get-Process -Id $HostPid -ErrorAction SilentlyContinue)
 }
 
+$script:ticks = 0
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 100
 $timer.add_Tick({
   try {
-    if (-not (Test-HostAlive)) {
+    $script:ticks += 1
+    if (($script:ticks % 10) -eq 0 -and -not (Test-HostAlive)) {
       $notify.Visible = $false
       [System.Windows.Forms.Application]::Exit()
       return

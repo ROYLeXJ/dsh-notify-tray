@@ -22,8 +22,11 @@ DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、
 | 平台 | 状态栏 | 系统通知 |
 |---|---|---|
 | macOS | JXA 脚本（`osascript`）驱动 NSStatusItem，用 NSBezierPath 画鲸鱼，菜单带 SF Symbols 图标和子菜单 | DSH 窗口内的原生通知；没有窗口时用 `osascript` |
-| Windows | 系统自带的 PowerShell 5.1 + WinForms NotifyIcon，用 GDI+ 画鲸鱼，悬停显示摘要 | DSH 窗口内的原生通知；没有窗口时用托盘气泡（在 Win10/11 上显示为 Toast） |
-| Linux | 纯 JS 的 D-Bus（`dbus-next`）实现 StatusNotifierItem 协议，鲸鱼由内置的软件光栅器画成像素图。适用于 x86_64、ARM64（鲲鹏、飞腾）、LoongArch 等各种 CPU | `org.freedesktop.Notifications`（可点击），没有时退回 `notify-send` |
+| Windows 桌面版 | **不加图标**：桌面版自带一个托盘图标，并排两个不像话；而那个图标的右键菜单是 Electron 主进程里写死的「打开 / 退出」，插件没有通道往里加项 | DSH 窗口内的原生通知；窗口不在时用系统 Toast（WinRT，不依赖托盘图标），点击通过 `dsh://open` 唤起窗口 |
+| Windows `dsh web` | 没有桌面版图标时才显示小鲸鱼：系统自带的 PowerShell 5.1 + WinForms NotifyIcon，用 GDI+ 画鲸鱼（按系统 DPI 画，高分屏不发虚），悬停显示摘要 | 浏览器通知；没有页面时用托盘气泡（Win10/11 显示为 Toast，点击跳到对应会话） |
+| Linux | 纯 JS 的 D-Bus（`dbus-next`）实现 StatusNotifierItem 协议，鲸鱼由内置的软件光栅器（扫描线、非零环绕）画成像素图，一帧约 1 毫秒。适用于 x86_64、ARM64（鲲鹏、飞腾）、LoongArch 等各种 CPU | `org.freedesktop.Notifications`（可点击），没有时退回 `notify-send` |
+
+点击托盘图标 / 通知 / 菜单里的「打开 DeepSeek Harness」：macOS 激活桌面版；Windows 重新拉起桌面版可执行文件，由 Electron 的单实例锁把已有窗口带到前台；没有桌面版（`dsh web`，Linux 都是这种情况）时在浏览器里打开 Web 界面。
 
 ## 安装
 
@@ -95,7 +98,7 @@ npm install
 npm test                         # 单元测试 + 宿主端到窗口端的集成测试
 node scripts/render-icons.mjs    # 改过 lib/whale.js 后重新生成 icon.svg 和 assets/preview.svg
 node scripts/demo.mjs            # 演示：空闲 → 工作中 → 完成（含通知）→ 空闲；--all 再加 等你处理 / 失败；--live 驱动真实鲸鱼
-DBUS_CONFIG=... node scripts/sni-smoke.mjs   # Linux 托盘协议冒烟测试（macOS 需先 brew install dbus）
+node scripts/sni-smoke.mjs       # Linux 托盘协议冒烟测试：起一个私有 dbus-daemon 扮演任务栏（macOS 需先 brew install dbus）
 DSH_NOTIFY_TRAY_DEBUG=1 dsh ...  # 把收到的事件记到 storages/dsh-notify-tray/debug.log
 ```
 
@@ -103,6 +106,10 @@ DSH_NOTIFY_TRAY_DEBUG=1 dsh ...  # 把收到的事件记到 storages/dsh-notify-
 
 ## 已知限制
 
+- 目前只在 macOS 上实际跑过；Windows / Linux 的代码经过静态检查和协议层冒烟测试（`scripts/sni-smoke.mjs` 用私有 dbus-daemon 扮演任务栏），但还没有在真机上验证过。
 - Linux 上目前没有 DSH 桌面版，Linux 用户一般是用 `dsh web` 加浏览器。浏览器里的通知需要你先在浏览器里允许通知权限。
 - 银河麒麟、UOS 的任务栏都支持 StatusNotifierItem。纯 GNOME 需要装 AppIndicator 扩展才能显示托盘图标。没有托盘宿主时插件只会记一条警告，通知功能照常工作。
+- Linux 会话总线地址取自 `DBUS_SESSION_BUS_ADDRESS`（支持 dbus-launch 的 `unix:abstract=` 地址，不需要原生模块），没有时用 systemd 的 `$XDG_RUNTIME_DIR/bus`；从 ssh 或 systemd 服务里启动 `dsh web` 时要自己把这些环境变量带上。
+- Windows 桌面版里没有状态栏图标，账户余额、今日用量这些只能在 macOS / Linux 的菜单里看（要进桌面版自己的托盘菜单得改 DSH 本身）。系统 Toast 以「Windows PowerShell」的名义发出（它的 AppUserModelID 每台 Win10/11 都注册了，DSH 自己的插件拿不到），标题和正文还是小鲸鱼的。
+- Windows `dsh web` 的托盘助手要求能运行 PowerShell 5.1 脚本并加载 WinForms（AppLocker / 受限语言模式会挡住它，那时只剩通知功能）。
 - 如果开启了 timed 模式的 `ask_user_question`，问题超时后托盘上的"待选择 / 待输入"可能会提前消失，但通知不受影响。

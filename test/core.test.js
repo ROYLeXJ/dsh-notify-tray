@@ -170,3 +170,41 @@ test('whale: every state has geometry, running animates, holes cut through', () 
   // Unknown states fall back to the idle whale instead of throwing.
   assert.equal(renderIcon(16, 'nope').length, 16 * 16 * 4)
 })
+
+test('linux: session bus address covers dbus-launch abstract sockets and the systemd user bus', async () => {
+  const { sessionBusAddress } = await import('../lib/tray/linux.js')
+  const { mkdtempSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  assert.equal(sessionBusAddress({ DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus' }), 'unix:path=/run/user/1000/bus')
+  // dbus-next needs a native module for abstract sockets; Node's net takes a NUL-prefixed path instead.
+  assert.equal(sessionBusAddress({ DBUS_SESSION_BUS_ADDRESS: 'unix:abstract=/tmp/dbus-AbC123,guid=9f' }), 'unix:path=\0/tmp/dbus-AbC123,guid=9f')
+  const runtime = mkdtempSync(join(tmpdir(), 'xdg-'))
+  assert.throws(() => sessionBusAddress({ XDG_RUNTIME_DIR: runtime }), /D-Bus/u)
+  writeFileSync(join(runtime, 'bus'), '')
+  assert.equal(sessionBusAddress({ XDG_RUNTIME_DIR: runtime }), `unix:path=${join(runtime, 'bus')}`)
+  assert.throws(() => sessionBusAddress({}), /D-Bus/u)
+})
+
+test('linux: the rasterizer draws the whole crop box, not just the 100-box', () => {
+  // The leaping "done" whale and the tail tip live outside the 100×100 box but inside BOUNDS.
+  const size = 48
+  const px = renderIcon(size, 'done', 3)
+  let topRows = 0
+  for (let y = 0; y < 7; y += 1) for (let x = 0; x < size; x += 1) if (px[(y * size + x) * 4] > 0) topRows += 1
+  assert.ok(topRows > 0, 'pixels above the box are drawn')
+  const t = performance.now()
+  for (let f = 0; f < 12; f += 1) for (const s of [22, 32, 48]) renderIcon(s, 'running', f)
+  assert.ok(performance.now() - t < 500, 'a full running cycle renders well under a second (it runs on the host thread)')
+})
+
+test('windows: toast XML escapes text and launches dsh://open only when asked', async () => {
+  const { toastXml } = await import('../lib/system.js')
+  const xml = toastXml({ title: '🐳 搞定啦～ <a&b>', body: 'it\'s "done"', launch: 'dsh://open' })
+  assert.ok(xml.startsWith('<toast activationType="protocol" launch="dsh://open">'))
+  assert.ok(xml.includes('<text>🐳 搞定啦～ &lt;a&amp;b&gt;</text><text>it&apos;s &quot;done&quot;</text>'))
+  assert.ok(xml.includes('ms-winsoundevent:Notification.Default'))
+  const quiet = toastXml({ title: 't', body: 'b', sound: false })
+  assert.ok(quiet.startsWith('<toast><visual>'), 'no activation without a launch target')
+  assert.ok(quiet.includes('<audio silent="true"/>'))
+})

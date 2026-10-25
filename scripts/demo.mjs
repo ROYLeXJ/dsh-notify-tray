@@ -98,7 +98,7 @@ try {
   await show(view('idle'))
   await countdown(5)
 
-  say('② 工作中：鲸鱼鼻子前冒泡泡（两帧动画），旁边「运行中 1」；菜单里是「演示任务 · 3 分钟 · bash」')
+  say('② 工作中：鲸鱼摆尾游泳、鼻子前冒泡泡（12 帧循环），旁边「运行中 1」；菜单里是「演示任务 · 3 分钟 · bash」')
   await show(view('running'))
   await countdown(6)
 
