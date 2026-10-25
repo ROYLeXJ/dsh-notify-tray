@@ -145,6 +145,37 @@ function run(argv) {
 
   // ---- view -> status item -----------------------------------------------------------
 
+  /** Row height / text inset of a native menu item, so info rows line up with the clickable ones. */
+  var INFO_ROW_H = 22
+  var INFO_INSET = 14
+
+  /**
+   * Read-only rows (balance, usage, …) are disabled so they never highlight or
+   * fire, but AppKit draws a disabled title at a very low alpha, which made
+   * them hard to read. A disabled item with a custom view is still inert, yet
+   * its view is drawn as-is: a plain NSTextField in secondaryLabelColor keeps
+   * the text legible while staying visibly dimmer than the actionable items.
+   */
+  function infoView(label) {
+    var field = $.NSTextField.alloc.initWithFrame($.NSMakeRect(INFO_INSET, 0, 200, INFO_ROW_H))
+    field.bezeled = false
+    field.drawsBackground = false
+    field.editable = false
+    field.selectable = false
+    field.font = $.NSFont.menuFontOfSize(0)
+    field.textColor = $.NSColor.secondaryLabelColor
+    field.stringValue = $(label)
+    field.sizeToFit
+    var size = field.frame.size
+    var width = INFO_INSET + size.width + INFO_INSET
+    field.frame = $.NSMakeRect(INFO_INSET, (INFO_ROW_H - size.height) / 2, size.width, size.height)
+    field.autoresizingMask = $.NSViewWidthSizable
+    var view = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, width, INFO_ROW_H))
+    view.autoresizingMask = $.NSViewWidthSizable // the menu stretches it to its own width
+    view.addSubview(field)
+    return view
+  }
+
   function buildMenu(rows) {
     var menu = $.NSMenu.alloc.init
     menu.autoenablesItems = false
@@ -156,7 +187,9 @@ function run(argv) {
       mi.enabled = row.enabled !== false
       var image = symbolImage(row.icon)
       if (image) mi.image = image
-      if (row.children && row.children.length) {
+      var hasChildren = Boolean(row.children && row.children.length)
+      if (!mi.enabled && !hasChildren) mi.view = infoView(row.label)
+      if (hasChildren) {
         mi.action = $()
         mi.enabled = true
         mi.submenu = buildMenu(row.children)
