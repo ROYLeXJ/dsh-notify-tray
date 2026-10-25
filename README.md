@@ -38,7 +38,7 @@ dsh plugin --profile desktop add dsh-notify-tray
 # Or the web / CLI profile
 dsh plugin --profile web add dsh-notify-tray
 # Pin a specific version
-dsh plugin --profile desktop add dsh-notify-tray@0.1.2
+dsh plugin --profile desktop add dsh-notify-tray@0.1.3
 ```
 
 **Option 3 — from the Git repository** (latest unreleased code)
@@ -49,7 +49,7 @@ This route **requires Git**; without it you'll see `ERR_PNPM_GIT_RESOLVE_FAILED 
 
 Restart DSH after installing. The version on the plugin page is the one installed; the latest is listed on [npm](https://www.npmjs.com/package/dsh-notify-tray).
 
-> **Got an older version?** When the official npm registry is unreachable, DSH falls back to the npmmirror registry, which syncs a little later, so a just-published release may not be there yet. Update again in a few minutes, or pin the version: `dsh plugin --profile desktop add dsh-notify-tray@0.1.2`.
+> **Got an older version?** When the official npm registry is unreachable, DSH falls back to the npmmirror registry, which syncs a little later, so a just-published release may not be there yet. Update again in a few minutes, or pin the version: `dsh plugin --profile desktop add dsh-notify-tray@0.1.3`.
 
 To update: `dsh plugin --profile desktop update dsh-notify-tray`. To uninstall: `dsh plugin --profile desktop remove dsh-notify-tray`.
 

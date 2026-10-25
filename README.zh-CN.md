@@ -38,7 +38,7 @@ dsh plugin --profile desktop add dsh-notify-tray
 # 或者 Web / 命令行 profile
 dsh plugin --profile web add dsh-notify-tray
 # 指定版本
-dsh plugin --profile desktop add dsh-notify-tray@0.1.2
+dsh plugin --profile desktop add dsh-notify-tray@0.1.3
 ```
 
 **方式三：从 Git 仓库装**（想用还没发版的最新代码时）
@@ -49,7 +49,7 @@ dsh plugin --profile desktop add dsh-notify-tray@0.1.2
 
 装好后重启 DSH。插件页上显示的版本号就是装上的版本，最新版见 [npm](https://www.npmjs.com/package/dsh-notify-tray)。
 
-> **装到的不是最新版？** 官方 npm 源连不上时，DSH 会退到 npmmirror（淘宝镜像）去装，镜像比官方源晚一点同步，刚发的新版可能还没到。等几分钟再更新，或指定版本 `dsh plugin --profile desktop add dsh-notify-tray@0.1.2`。
+> **装到的不是最新版？** 官方 npm 源连不上时，DSH 会退到 npmmirror（淘宝镜像）去装，镜像比官方源晚一点同步，刚发的新版可能还没到。等几分钟再更新，或指定版本 `dsh plugin --profile desktop add dsh-notify-tray@0.1.3`。
 
 更新：`dsh plugin --profile desktop update dsh-notify-tray`。卸载：`dsh plugin --profile desktop remove dsh-notify-tray`。
 
