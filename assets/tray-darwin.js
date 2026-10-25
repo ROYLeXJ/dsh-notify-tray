@@ -148,17 +148,40 @@ function run(argv) {
   /** Row height / text inset of a native menu item, so info rows line up with the clickable ones. */
   var INFO_ROW_H = 22
   var INFO_INSET = 14
+  /** Leading SF Symbol of an info row: size and gap to the text. */
+  var INFO_ICON = 16
+  var INFO_GAP = 6
+
+  /** The user's accent colour (System Settings › Appearance), dark-mode aware; blue before 10.14. */
+  function accentColor() {
+    var accent = $.NSColor.controlAccentColor
+    return accent && !accent.isNil() ? accent : $.NSColor.systemBlueColor
+  }
 
   /**
    * Read-only rows (balance, usage, …) are disabled so they never highlight or
    * fire, but AppKit draws a disabled title at a very low alpha, which made
    * them hard to read. A disabled item with a custom view is still inert, yet
-   * its view is drawn as-is: a plain NSTextField in labelColor (solid black in
-   * light mode, white in dark mode) reads exactly like the actionable items,
-   * minus the hover highlight and the click.
+   * its view is drawn as-is: the text is a plain NSTextField in labelColor
+   * (solid black in light mode, white in dark mode), so it reads as clearly as
+   * the actionable items. What tells the two apart is the row's own SF Symbol
+   * drawn in front of the text in the accent colour: clickable items carry no
+   * icon, info rows always do.
    */
-  function infoView(label) {
-    var field = $.NSTextField.alloc.initWithFrame($.NSMakeRect(INFO_INSET, 0, 200, INFO_ROW_H))
+  function infoView(label, iconName) {
+    var x = INFO_INSET
+    var view = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 200, INFO_ROW_H))
+    view.autoresizingMask = $.NSViewWidthSizable // the menu stretches it to its own width
+    var image = symbolImage(iconName)
+    if (image) {
+      var iconView = $.NSImageView.alloc.initWithFrame($.NSMakeRect(x, (INFO_ROW_H - INFO_ICON) / 2, INFO_ICON, INFO_ICON))
+      iconView.image = image
+      iconView.imageScaling = $.NSImageScaleProportionallyUpOrDown
+      iconView.contentTintColor = accentColor()
+      view.addSubview(iconView)
+      x += INFO_ICON + INFO_GAP
+    }
+    var field = $.NSTextField.alloc.initWithFrame($.NSMakeRect(x, 0, 200, INFO_ROW_H))
     field.bezeled = false
     field.drawsBackground = false
     field.editable = false
@@ -168,12 +191,10 @@ function run(argv) {
     field.stringValue = $(label)
     field.sizeToFit
     var size = field.frame.size
-    var width = INFO_INSET + size.width + INFO_INSET
-    field.frame = $.NSMakeRect(INFO_INSET, (INFO_ROW_H - size.height) / 2, size.width, size.height)
+    field.frame = $.NSMakeRect(x, (INFO_ROW_H - size.height) / 2, size.width, size.height)
     field.autoresizingMask = $.NSViewWidthSizable
-    var view = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, width, INFO_ROW_H))
-    view.autoresizingMask = $.NSViewWidthSizable // the menu stretches it to its own width
     view.addSubview(field)
+    view.frame = $.NSMakeRect(0, 0, x + size.width + INFO_INSET, INFO_ROW_H)
     return view
   }
 
@@ -189,7 +210,7 @@ function run(argv) {
       var image = symbolImage(row.icon)
       if (image) mi.image = image
       var hasChildren = Boolean(row.children && row.children.length)
-      if (!mi.enabled && !hasChildren) mi.view = infoView(row.label)
+      if (!mi.enabled && !hasChildren) mi.view = infoView(row.label, row.icon)
       if (hasChildren) {
         mi.action = $()
         mi.enabled = true
