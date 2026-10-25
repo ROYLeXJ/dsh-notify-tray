@@ -93,6 +93,7 @@ DSH 宿主进程（lib/index.js）
 npm install
 npm test                         # 单元测试 + 宿主端到窗口端的集成测试
 node scripts/render-icons.mjs    # 改过 lib/whale.js 后重新生成 icon.svg 和 assets/preview.svg
+node scripts/demo.mjs            # 演示：空闲 → 工作中 → 完成（含通知）→ 空闲；--all 再加 等你处理 / 失败；--live 驱动真实鲸鱼
 DBUS_CONFIG=... node scripts/sni-smoke.mjs   # Linux 托盘协议冒烟测试（macOS 需先 brew install dbus）
 DSH_NOTIFY_TRAY_DEBUG=1 dsh ...  # 把收到的事件记到 storages/dsh-notify-tray/debug.log
 ```
