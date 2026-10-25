@@ -21,26 +21,29 @@ macOS 上鲸鱼是菜单栏图标，颜色自动跟随菜单栏，旁边显示 `
 
 ## 安装
 
-**前提：本机要装有 Git。** 安装时 DSH 会用 Git 拉取仓库，没有 Git 会报 `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' 不是内部或外部命令`。
-
-- Windows：先到 <https://git-scm.com/download/win> 下载安装 Git（一路默认即可），装完重启 DSH。
-- macOS：终端里运行一次 `git --version`，按提示安装命令行工具即可。
+插件已发布到 npm：[`dsh-notify-tray`](https://www.npmjs.com/package/dsh-notify-tray)。从 npm 安装只需要 DSH 本身，**不需要装 Git**。
 
 **方式一：在 DSH 里装（推荐）**
-打开 DSH「插件 → 添加插件」，输入框里填 `https://github.com/ROYLeXJ/dsh-notify-tray.git`，点「安装」。
+打开 DSH「插件 → 添加插件」，输入框里填 `dsh-notify-tray`，点「安装」。
 
 **方式二：命令行**
 
 ```sh
 # 桌面版（App 内置的 dsh 命令）
-dsh plugin --profile desktop add https://github.com/ROYLeXJ/dsh-notify-tray.git
+dsh plugin --profile desktop add dsh-notify-tray
 # 或者 Web / 命令行 profile
-dsh plugin --profile web add https://github.com/ROYLeXJ/dsh-notify-tray.git
-# 也可以先下载 / 克隆仓库，再从本地目录安装
-dsh plugin --profile desktop add /path/to/dsh-notify-tray
+dsh plugin --profile web add dsh-notify-tray
+# 指定版本
+dsh plugin --profile desktop add dsh-notify-tray@0.1.0
 ```
 
-装好后重启 DSH。卸载：`dsh plugin --profile desktop remove dsh-notify-tray`。
+**方式三：从 Git 仓库装**（想用还没发版的最新代码时）
+
+在「插件 → 添加插件」里填 `https://github.com/ROYLeXJ/dsh-notify-tray.git`，或运行 `dsh plugin --profile desktop add https://github.com/ROYLeXJ/dsh-notify-tray.git`；也可以先克隆仓库再从本地目录安装：`dsh plugin --profile desktop add /path/to/dsh-notify-tray`。
+
+这条路**需要本机装有 Git**，没有 Git 会报 `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' 不是内部或外部命令`。Windows 先到 <https://git-scm.com/download/win> 下载安装（一路默认即可），装完重启 DSH；macOS 在终端里运行一次 `git --version`，按提示安装命令行工具即可。
+
+装好后重启 DSH。更新：`dsh plugin --profile desktop update dsh-notify-tray`。卸载：`dsh plugin --profile desktop remove dsh-notify-tray`。
 
 ## 设置
 

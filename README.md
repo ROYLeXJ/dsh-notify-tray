@@ -21,26 +21,29 @@ On macOS the whale is a menu-bar icon that follows the menu-bar colour, with a s
 
 ## Installation
 
-**Prerequisite: Git must be installed.** DSH clones the repository with Git during installation; without it you'll see `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' is not recognized as an internal or external command`.
-
-- Windows: install Git from <https://git-scm.com/download/win> (the defaults are fine), then restart DSH.
-- macOS: run `git --version` once in Terminal and follow the prompt to install the command-line tools.
+The plugin is published on npm as [`dsh-notify-tray`](https://www.npmjs.com/package/dsh-notify-tray). Installing from npm needs nothing beyond DSH itself — no Git required.
 
 **Option 1 — from inside DSH (recommended)**
-Open DSH **Plugins → Add plugin**, paste `https://github.com/ROYLeXJ/dsh-notify-tray.git` into the input box and click **Install**.
+Open DSH **Plugins → Add plugin**, type `dsh-notify-tray` into the input box and click **Install**.
 
 **Option 2 — command line**
 
 ```sh
 # Desktop app (the dsh command bundled with the app)
-dsh plugin --profile desktop add https://github.com/ROYLeXJ/dsh-notify-tray.git
+dsh plugin --profile desktop add dsh-notify-tray
 # Or the web / CLI profile
-dsh plugin --profile web add https://github.com/ROYLeXJ/dsh-notify-tray.git
-# You can also download / clone the repo first and install from a local directory
-dsh plugin --profile desktop add /path/to/dsh-notify-tray
+dsh plugin --profile web add dsh-notify-tray
+# Pin a specific version
+dsh plugin --profile desktop add dsh-notify-tray@0.1.0
 ```
 
-Restart DSH after installing. To uninstall: `dsh plugin --profile desktop remove dsh-notify-tray`.
+**Option 3 — from the Git repository** (latest unreleased code)
+
+Paste `https://github.com/ROYLeXJ/dsh-notify-tray.git` into **Plugins → Add plugin**, or run `dsh plugin --profile desktop add https://github.com/ROYLeXJ/dsh-notify-tray.git`. You can also clone the repo and install from a local directory: `dsh plugin --profile desktop add /path/to/dsh-notify-tray`.
+
+This route **requires Git**; without it you'll see `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' is not recognized as an internal or external command`. On Windows install Git from <https://git-scm.com/download/win> (the defaults are fine) and restart DSH; on macOS run `git --version` once in Terminal and follow the prompt to install the command-line tools.
+
+Restart DSH after installing. To update: `dsh plugin --profile desktop update dsh-notify-tray`. To uninstall: `dsh plugin --profile desktop remove dsh-notify-tray`.
 
 ## Configuration
 
