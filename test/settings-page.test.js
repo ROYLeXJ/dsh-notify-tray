@@ -36,7 +36,7 @@ function render(node, depth = 0) {
 }
 const collect = (tree, out = []) => { if (tree && typeof tree === 'object') { if (!Array.isArray(tree)) out.push(tree); for (const c of Array.isArray(tree) ? tree : tree.children ?? []) collect(c, out) } return out }
 
-test('settings page registers into plugins.row.config and renders every field', () => {
+test('settings page registers into plugins.bundle.config only and renders every field', () => {
   let factory
   const sandbox = { window: { __ModuleLoader__: { load: ({ factory: f }) => { factory = f } } }, console, fetch: () => Promise.reject(new Error('offline')), setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} } }
   vm.runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), sandbox)
@@ -56,9 +56,9 @@ test('settings page registers into plugins.row.config and renders every field', 
   }
   client.apply(cctx)
 
-  assert.equal(registrations.length, 2, 'package page + component row')
-  assert.deepEqual(registrations.map(r => [r.options.name, r.options.key]), [['plugins.bundle.config', 'dsh-notify-tray'], ['plugins.row.config', 'dsh-notify-tray#notify-tray']])
-  const { options, Component } = registrations[1]
+  assert.equal(registrations.length, 1, 'package page only — no second page behind the component row')
+  assert.deepEqual(registrations.map(r => [r.options.name, r.options.key]), [['plugins.bundle.config', 'dsh-notify-tray']])
+  const { options, Component } = registrations[0]
   const face = options.inject()
   const t = cctx.locale.bind(options.locale)
   const props = { t, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }

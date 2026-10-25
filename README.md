@@ -4,7 +4,7 @@ DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、
 
 - **系统通知**：任务完成、任务失败、需要批准、需要你选择、需要你输入时弹系统通知，文案是小鲸鱼的口吻（比如「🐳 搞定啦～『写周报』做完了！快来验收」）。点击通知会跳到对应会话。
 - **状态栏小鲸鱼**：状态栏常驻一只小鲸鱼，用姿态告诉你现在的状态；下拉菜单里是正在运行的任务、等你处理的事项、今日用量和最近结束的任务，点一下就能跳到对应会话。
-- **插件设置页**：所有选项都能在 DSH「插件」页里直接改，包括当前模型的 API 价格和你买的套餐（Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / Groq / DeepSeek 或自定义），能从接口拿到的余额 / 剩余额度自动拿，拿不到的手填。
+- **插件设置页**：所有选项都能在 DSH「插件」页里直接改，包括当前模型的 API 价格和你买的套餐（Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / DeepSeek 或自定义），能从接口拿到的余额 / 剩余额度自动拿，拿不到的手填。
 
 ![四种状态](assets/preview.svg)
 
@@ -88,7 +88,7 @@ dsh plugin --profile desktop add /path/to/dsh-notify-tray
 
 | 选项 | 默认值 | 说明 |
 |---|---|---|
-| `planProvider` | `none` | `none` / `custom` / `deepseek` / `kimi` / `glm` / `opencode` / `mimo` / `gemini` / `grok` / `claude` / `gpt` / `minimax` / `groq` |
+| `planProvider` | `none` | `none` / `custom` / `deepseek` / `kimi` / `glm` / `opencode` / `mimo` / `gemini` / `grok` / `claude` / `gpt` / `minimax` |
 | `planId` | 空 | 预设套餐 ID（在设置页的下拉框里选，会自动填好名称、价格、周期、币种、额度说明） |
 | `planName` / `planPrice` / `planPeriod` / `planCurrency` / `planQuota` | 预设 | 每一项都可以改；留空用预设 |
 | `planBalance` | 空 | 套餐余额 / 预付费余额（手填；能从接口拿到时留空） |
@@ -113,7 +113,6 @@ dsh plugin --profile desktop add /path/to/dsh-notify-tray
 | Claude | Pro / Max 5x / Max 20x / Team、API 按量 | 普通 Key 无接口 |
 | GPT | ChatGPT Go / Plus / Pro 5x / Pro 20x / Business、API 按量 | 普通 Key 无接口 |
 | MiniMax | M Plan Go / Explore / Build（国内 ¥49 / 119 / 469，国际 $22 / 55 / 132）、旧版 Coding Plan | 5 小时窗口剩余 `GET /v1/coding_plan/remains` |
-| Groq | Free / Developer | 无（只在响应头里） |
 
 拿不到的信息就手填；留空也可以，留空的项不显示。状态栏菜单里会多一行「套餐 · 名称 · 价格 · 剩余」，子菜单里有余额、剩余额度、重置时间、接口返回的明细、「刷新额度」和用量页 / 价格页链接。
 

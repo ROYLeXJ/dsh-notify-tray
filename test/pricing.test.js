@@ -15,7 +15,7 @@ const PI = {
 }
 
 test('catalog: every provider has plans, prices in a known currency, and a usable quota spec or none', () => {
-  assert.ok(PROVIDERS.length >= 11)
+  assert.ok(PROVIDERS.length >= 10)
   for (const p of PROVIDERS) {
     assert.ok(p.plans.length > 0, p.id)
     for (const row of Object.values(p.prices)) assert.ok(['CNY', 'USD'].includes(row.currency), `${p.id} price currency`)
