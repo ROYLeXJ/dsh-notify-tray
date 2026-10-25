@@ -9,6 +9,31 @@ import { classifyQuestion, Tracker } from '../lib/tracker.js'
 const session = (id, header = {}) => ({ id, header: { cwd: '/work/demo', ...header } })
 const agent = (id, header) => ({ id, session: session(id, header), status: 'idle' })
 const ev = (type, data) => ({ type, data, seq: 0, time: Date.now() })
+/** `tool/result` data exactly as DSH appends it (ToolResultMessage: `toolCallId` + `source.callId`, no `callId`). */
+const toolResult = callId => ({
+  turn: 1,
+  step: 1,
+  message: { role: 'tool', source: { kind: 'tool', callId }, toolCallId: callId, content: [{ type: 'text', text: '{"answers":[]}' }], isError: false, id: `m-${callId}` },
+})
+
+test('answering a question mid-turn clears it while the turn keeps running', () => {
+  const t = new Tracker()
+  const s = session('s1')
+  t.agentStatus(agent('s1'), 'running')
+  t.sessionEvent(s, ev('tool/call', { callId: 'q1', name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ question: '上传？', options: [{ label: '好' }] }] }) }))
+  t.sessionEvent(s, ev('tool/call', { callId: 'q2', name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ question: '标题？' }] }) }))
+  assert.equal(t.summary().waiting.length, 2)
+  t.sessionEvent(s, ev('tool/result', toolResult('q1')))
+  assert.deepEqual(t.summary().waiting.map(w => w.kind), ['input'])
+  t.sessionEvent(s, ev('tool/result', toolResult('q2')))
+  assert.equal(t.summary().waiting.length, 0)
+  assert.equal(t.summary().running, 1)
+  // An approval tied to a call is settled by that call's result even without `approval/decided`.
+  t.sessionEvent(s, ev('approval/asked', { id: 'ap1', toolName: 'bash', callId: 'b1' }))
+  assert.equal(t.summary().waiting.length, 1)
+  t.sessionEvent(s, ev('tool/result', toolResult('b1')))
+  assert.equal(t.summary().waiting.length, 0)
+})
 
 test('ask_user_question with options is a choice, without is input', () => {
   assert.equal(classifyQuestion(JSON.stringify({ questions: [{ id: 'a', question: '选哪个？', options: [{ label: 'A' }] }] })).kind, 'choice')
@@ -34,7 +59,7 @@ test('tracker emits events and counts outcomes for top-level sessions only', () 
   t.sessionEvent(s, ev('approval/decided', { id: 'ap1', outcome: 'allowed-once' }))
   t.sessionEvent(s, ev('tool/call', { callId: 'q1', name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ question: '用哪个库？', options: [{ label: 'a' }] }] }) }))
   assert.equal(t.summary().waiting[0].kind, 'choice')
-  t.sessionEvent(s, ev('tool/result', { message: { callId: 'q1' } }))
+  t.sessionEvent(s, ev('tool/result', toolResult('q1')))
   assert.equal(t.summary().waiting.length, 0)
   t.sessionEvent(child, ev('turn/end', { turn: 1, reason: { kind: 'completed' } }))
   t.sessionEvent(s, ev('turn/end', { turn: 1, reason: { kind: 'completed' } }))
