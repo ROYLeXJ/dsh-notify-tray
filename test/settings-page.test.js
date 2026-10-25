@@ -56,10 +56,9 @@ test('settings page registers into plugins.row.config and renders every field', 
   }
   client.apply(cctx)
 
-  assert.equal(registrations.length, 1)
-  const { options, Component } = registrations[0]
-  assert.equal(options.name, 'plugins.row.config')
-  assert.equal(options.key, 'dsh-notify-tray#notify-tray')
+  assert.equal(registrations.length, 2, 'package page + component row')
+  assert.deepEqual(registrations.map(r => [r.options.name, r.options.key]), [['plugins.bundle.config', 'dsh-notify-tray'], ['plugins.row.config', 'dsh-notify-tray#notify-tray']])
+  const { options, Component } = registrations[1]
   const face = options.inject()
   const t = cctx.locale.bind(options.locale)
   const props = { t, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }
@@ -106,6 +105,7 @@ test('settings page: choosing a provider fills the plan preset and shows quota f
   }
   client.apply(cctx)
   const { options, Component } = registrations[0]
+  assert.equal(options.name, 'plugins.bundle.config')
   const face = options.inject()
   const t = cctx.locale.bind(options.locale)
   const props = { t, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }
