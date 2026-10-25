@@ -30,15 +30,19 @@ const vol = value => ({ get: () => value })
 test('host route feeds client notifications and click opens the session', async () => {
   const { apply } = await import('../lib/index.js')
   const ctx = fakeCtx()
-  let route
-  ctx.services.webServer = { register: r => { route = r; return () => {} } }
+  const routes = {}
+  ctx.services.webServer = { register: r => { routes[r.path] = r; return () => {} } }
   ctx.services.connection = { requestRejection: () => undefined }
   apply(ctx, {
     notifyCompleted: vol(true), notifyFailed: vol(true), notifyApproval: vol(true), notifyChoice: vol(true), notifyInput: vol(false),
     channel: vol('auto'), suppressWhenFocused: vol(true), sound: vol(false), tray: vol(false),
     showSpendInTitle: vol(true), spendSource: vol('auto'), currency: vol('CNY'), balancePollMinutes: vol(5), prices: vol({}), errorHoldMinutes: vol(10),
+    priceSource: vol('auto'), customPriceCurrency: vol('CNY'), exchangeRate: vol(7), planProvider: vol('kimi'), planId: vol('cn-pro'), planPeriod: vol('month'), planCurrency: vol('CNY'), planRemaining: vol('68%'), planAutoQuota: vol(false), quotaPollMinutes: vol(10),
   })
-  assert.equal(route.path, '/notify-tray/state')
+  const route = routes['/notify-tray/state']
+  assert.ok(route)
+  assert.ok(routes['/notify-tray/catalog'])
+  assert.ok(routes['/notify-tray/refresh'])
 
   const call = (url) => new Promise(resolve => {
     const res = { headers: {}, setHeader(k, v) { this.headers[k] = v }, end(body) { resolve({ status: this.statusCode, body: JSON.parse(body) }) } }
@@ -100,6 +104,31 @@ test('host route feeds client notifications and click opens the session', async 
   const state = await call('/notify-tray/state?after=999')
   assert.equal(state.body.summary.today.completed, 1)
   assert.equal(state.body.summary.today.failed, 1)
+
+  // The plan preset merged with the user's overrides rides along for the settings page and the tray.
+  assert.equal(state.body.plan.name, 'Kimi 会员 Pro')
+  assert.equal(state.body.plan.priceText, '¥199/月')
+  assert.equal(state.body.plan.remaining, '68%')
+  assert.equal(state.body.plan.remainingSource, 'manual')
+  assert.equal(state.body.plan.canFetch, true)
+  assert.equal(state.body.plan.fetch, undefined, 'no key reference: nothing fetched')
+
+  // Usage is filed under provider/model and priced from the plugin's catalog, converted to CNY at the configured rate.
+  ctx.emit('session/event', session, { type: 'request/header', data: { header: { config: { provider: 'anthropic', model: 'claude-fable-5-1' } }, reason: 'initial' } })
+  ctx.emit('session/event', session, { type: 'assistant/message', data: { turn: 3, step: 0, usage: { inputTokens: 1_000_000, outputTokens: 0 } } })
+  const priced = await call('/notify-tray/state?after=999')
+  assert.equal(priced.body.usage.byModel[0].key, 'anthropic/claude-fable-5-1')
+  assert.equal(priced.body.usage.byModel[0].cost, 70, '$10 per million × rate 7')
+  assert.equal(priced.body.pricing.model, 'claude-fable-5-1')
+  assert.equal(priced.body.pricing.listed.currency, 'USD')
+  assert.equal(priced.body.pricing.effective.input, 70)
+
+  // The catalog route serves the plan presets the page's pickers are built from.
+  const catalog = await new Promise(resolve => {
+    const res = { headers: {}, setHeader(k, v) { this.headers[k] = v }, end(body) { resolve(JSON.parse(body)) } }
+    routes['/notify-tray/catalog'].handler({ method: 'GET', url: '/notify-tray/catalog' }, res)
+  })
+  assert.ok(catalog.providers.some(p => p.id === 'kimi' && p.plans.some(x => x.id === 'cn-pro')))
 })
 
 test.after(() => {

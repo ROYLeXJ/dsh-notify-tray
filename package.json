@@ -14,7 +14,7 @@
   ],
   "type": "module",
   "main": "./lib/index.js",
-  "icon": "./icon.svg",
+  "icon": "./icon.webp",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -26,7 +26,7 @@
     "lib",
     "assets",
     "locale",
-    "icon.svg",
+    "icon.webp",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -48,7 +48,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test --test-force-exit test/"
   },
   "dsh": {
     "bundle": {
