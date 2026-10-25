@@ -31,6 +31,19 @@
     "README.md"
   ],
   "license": "MIT",
+  "author": "ROYLeXJ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ROYLeXJ/dsh-notify-tray.git"
+  },
+  "homepage": "https://github.com/ROYLeXJ/dsh-notify-tray#readme",
+  "bugs": {
+    "url": "https://github.com/ROYLeXJ/dsh-notify-tray/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=20"
   },
