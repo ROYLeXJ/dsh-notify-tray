@@ -6,8 +6,9 @@
 // The host rewrites view.json atomically; this script polls its mtime. Menu
 // clicks are written to stdout as one JSON line each: {"action":"<id>"}.
 //
-// The icon is the whale from lib/whale.js, shipped inside view.json as bezier
-// paths (`view.icon`) and rasterized here into a template image at 1x and 2x.
+// The icon is the whale from lib/whale.js, shipped as bezier paths in
+// icon.json (next to view.json; one frame list per state, plus fps / loop)
+// and rasterized here into template images at 1x and 2x.
 // Template images take the menu bar's own colour (white on dark, black on
 // light), exactly like the system icons next to it, so no tinting happens:
 // the whale's state is told by its shape (spout / "!" / "×"), not its colour.
@@ -16,10 +17,10 @@ ObjC.import('stdlib')
 ObjC.import('signal')
 
 /** Icon size in points: the whale is wider than tall, so 22×16 sits like an 18 pt template icon. */
-var ICON_H = 16
-var ICON_W = 22
-/** Seconds between animation frames while a state animates (running = spout). */
-var FRAME_SECONDS = 0.6
+var ICON_H = 17
+var ICON_W = 23
+/** Timer period: view.json is polled and animation frames advanced at this rate. */
+var TICK_SECONDS = 0.1
 
 function run(argv) {
   var viewPath = argv[0]
@@ -31,11 +32,10 @@ function run(argv) {
   var stdout = $.NSFileHandle.fileHandleWithStandardOutput
   var fm = $.NSFileManager.defaultManager
   var lastStamp = ''
-  var icon = null          // view.icon: { box, frames: { state: [paths...] } }
+  var icon = null          // icon.json: { box, bounds, frames: { state: [paths...] }, anim: { state: { fps, loop } } }
   var images = {}          // "<state>:<frame>" -> NSImage
   var symbolCache = {}
-  var current = { state: 'idle', frame: 0, frames: 1 }
-  var ticks = 0
+  var current = { state: 'idle', frame: 0, frames: 1, fps: 1, loop: false, clock: 0 }
 
   function send(action) {
     var line = $(JSON.stringify({ action: action }) + '\n').dataUsingEncoding($.NSUTF8StringEncoding)
@@ -50,6 +50,13 @@ function run(argv) {
     if (!hostPid) return true
     // kill(pid, 0) succeeds while the host process exists.
     return $.kill(hostPid, 0) === 0
+  }
+
+  function readIcon() {
+    var iconPath = viewPath.replace(/[^\/]+$/, 'icon.json')
+    var text = $.NSString.stringWithContentsOfFileEncodingError(iconPath, $.NSUTF8StringEncoding, null)
+    if (!text || text.isNil()) return null
+    try { return JSON.parse(ObjC.unwrap(text)) } catch (e) { return null }
   }
 
   function readView() {
@@ -160,12 +167,12 @@ function run(argv) {
   }
 
   function apply(view) {
-    if (view.icon) {
-      icon = view.icon
-      images = {}
-    }
+    if (view.icon) { icon = view.icon; images = {} } // legacy: geometry inline
+    if (!icon) icon = readIcon()
     var frames = (icon && icon.frames[view.state]) ? icon.frames[view.state].length : 1
-    current = { state: view.state, frame: 0, frames: frames }
+    var anim = (icon && icon.anim && icon.anim[view.state]) || { fps: 1, loop: false }
+    // Same state again (e.g. the menu changed while running): keep the animation where it is.
+    if (view.state !== current.state) current = { state: view.state, frame: 0, frames: frames, fps: anim.fps, loop: anim.loop, clock: 0 }
     var button = item.button
     button.imagePosition = $.NSImageLeft
     showFrame()
@@ -193,10 +200,14 @@ function run(argv) {
             if (!hostAlive()) { app.terminate(null); return }
             var view = readView()
             if (view) apply(view)
-            ticks += 1
-            if (current.frames > 1 && ticks % Math.max(1, Math.round(FRAME_SECONDS / 0.3)) === 0) {
-              current.frame = (current.frame + 1) % current.frames
-              showFrame()
+            if (current.frames > 1 && (current.loop || current.frame < current.frames - 1)) {
+              current.clock += TICK_SECONDS
+              var step = 1 / Math.max(1, current.fps)
+              if (current.clock >= step) {
+                current.clock -= step
+                current.frame = current.loop ? (current.frame + 1) % current.frames : Math.min(current.frames - 1, current.frame + 1)
+                showFrame()
+              }
             }
           } catch (e) {
             // ObjC callbacks swallow exceptions silently; surface them on stderr.
@@ -211,6 +222,6 @@ function run(argv) {
   var first = readView()
   if (first) apply(first)
   else item.button.title = $(' …')
-  $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.3, target, 'tick:', null, true)
+  $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(TICK_SECONDS, target, 'tick:', null, true)
   app.run
 }

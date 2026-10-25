@@ -139,10 +139,21 @@ test('view: recent failure shows error, idle otherwise', () => {
 
 test('whale: every state has geometry, running animates, holes cut through', () => {
   const spec = iconSpec()
-  assert.deepEqual(Object.keys(spec.frames), ['idle', 'running', 'attention', 'error'])
-  assert.equal(whaleFrames('running').length, 2)
+  assert.deepEqual(Object.keys(spec.frames), ['idle', 'running', 'attention', 'error', 'done'])
+  assert.ok(whaleFrames('running').length >= 8, 'running is a real animation')
+  assert.equal(spec.anim.running.loop, true)
+  assert.equal(spec.anim.done.loop, false, 'the celebration plays once')
   assert.equal(whaleFrames('idle').length, 1)
   assert.ok(whalePaths('attention').length > whalePaths('idle').length)
+  // Every frame of every state stays inside the crop box.
+  for (const state of Object.keys(spec.frames)) {
+    for (const frame of spec.frames[state]) {
+      for (const sub of frame) for (const cmd of sub) for (let i = 1; i < cmd.length; i += 2) {
+        assert.ok(cmd[i] >= spec.bounds.x - 0.5 && cmd[i] <= spec.bounds.x + spec.bounds.w + 0.5, `${state} x in bounds`)
+        assert.ok(cmd[i + 1] >= spec.bounds.y - 0.5 && cmd[i + 1] <= spec.bounds.y + spec.bounds.h + 0.5, `${state} y ${cmd[i + 1]} in bounds`)
+      }
+    }
+  }
   assert.ok(flatten(whalePaths('idle')).every(poly => poly.length > 2))
   assert.ok(whaleSvg({ state: 'error' }).startsWith('<svg'))
 

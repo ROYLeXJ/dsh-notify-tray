@@ -24,10 +24,17 @@ function Send-Action([string]$Id) {
   $stdout.Flush()
 }
 
-# The icon is the whale from lib/whale.js, shipped inside view.json as bezier
-# paths (`view.icon`) and drawn here with GDI+ in the state colour.
+# The icon is the whale from lib/whale.js, shipped as bezier paths in icon.json
+# next to view.json (one frame list per state, plus fps / loop) and drawn here
+# with GDI+ in the state colour.
 $script:iconSpec = $null
 $script:iconCache = @{}
+
+function Read-IconSpec {
+  $path = Join-Path (Split-Path -Parent $ViewPath) 'icon.json'
+  if (-not (Test-Path -LiteralPath $path)) { return $null }
+  try { return ([System.IO.File]::ReadAllText($path, $utf8) | ConvertFrom-Json) } catch { return $null }
+}
 
 function New-WhalePath($Paths, $Spec, [int]$W, [int]$H) {
   $path = New-Object System.Drawing.Drawing2D.GraphicsPath
@@ -148,9 +155,12 @@ function Set-Menu($rows) {
 
 $script:lastStamp = ''
 $script:lastToast = 0
-$script:state = 'idle'
+$script:state = ''
 $script:frame = 0
 $script:frameCount = 1
+$script:fps = 1
+$script:loop = $false
+$script:clock = 0.0
 
 function Update-FromView {
   if (-not (Test-Path -LiteralPath $ViewPath)) { return }
@@ -162,17 +172,24 @@ function Update-FromView {
     $view = [System.IO.File]::ReadAllText($ViewPath, $utf8) | ConvertFrom-Json
   } catch { return }
 
-  if ($view.icon) {
-    $script:iconSpec = $view.icon
-    $script:iconCache = @{}
+  if ($view.icon) { $script:iconSpec = $view.icon; $script:iconCache = @{} }
+  if ($null -eq $script:iconSpec) { $script:iconSpec = Read-IconSpec }
+  $state = [string]$view.state
+  if ($state -ne $script:state) {
+    # A new state restarts its animation; the same state keeps playing.
+    $script:state = $state
+    $script:frame = 0
+    $script:clock = 0.0
+    $script:frameCount = 1
+    $script:fps = 1
+    $script:loop = $false
+    if ($script:iconSpec -and $script:iconSpec.frames.$state) {
+      $script:frameCount = @($script:iconSpec.frames.$state).Count
+      $anim = $script:iconSpec.anim.$state
+      if ($anim) { $script:fps = [double]$anim.fps; $script:loop = [bool]$anim.loop }
+    }
+    $notify.Icon = Get-StateIcon $state 0
   }
-  $script:state = [string]$view.state
-  $script:frame = 0
-  $script:frameCount = 1
-  if ($script:iconSpec -and $script:iconSpec.frames.($script:state)) {
-    $script:frameCount = $script:iconSpec.frames.($script:state).Count
-  }
-  $notify.Icon = Get-StateIcon $script:state 0
   # .NET Framework caps NotifyIcon.Text at 63 characters.
   $tip = [string]$view.tooltip
   if ($tip.Length -gt 63) { $tip = $tip.Substring(0, 62) + [char]0x2026 }
@@ -194,7 +211,7 @@ function Test-HostAlive {
 }
 
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 600
+$timer.Interval = 100
 $timer.add_Tick({
   try {
     if (-not (Test-HostAlive)) {
@@ -203,10 +220,15 @@ $timer.add_Tick({
       return
     }
     Update-FromView
-    # Spout animation: swap frames every tick (600 ms) while the state animates.
-    if ($script:frameCount -gt 1) {
-      $script:frame = ($script:frame + 1) % $script:frameCount
-      $notify.Icon = Get-StateIcon $script:state $script:frame
+    # Advance the state's animation at its own fps; one-shot states hold their last frame.
+    if ($script:frameCount -gt 1 -and ($script:loop -or $script:frame -lt $script:frameCount - 1)) {
+      $script:clock += $timer.Interval / 1000.0
+      $step = 1.0 / [Math]::Max(1.0, $script:fps)
+      if ($script:clock -ge $step) {
+        $script:clock -= $step
+        if ($script:loop) { $script:frame = ($script:frame + 1) % $script:frameCount } else { $script:frame += 1 }
+        $notify.Icon = Get-StateIcon $script:state $script:frame
+      }
     }
   } catch {
     [Console]::Error.WriteLine($_.Exception.Message)

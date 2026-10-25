@@ -6,9 +6,9 @@
 //   node scripts/demo.mjs --all      # also show 需要批准 / 失败
 //
 // States shown, in order: 空闲 → 工作中（冒泡）→ 需要你选择（通知）→ 等你输入（通知）→ 完成（通知）→ 空闲.
-import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { buildView } from '../lib/format.js'
 import { speak } from '../lib/voice.js'
 import { systemNotify } from '../lib/system.js'
@@ -69,17 +69,18 @@ let cleanup = async () => {}
 if (live) {
   let backup
   try { backup = await readFile(realView) } catch {}
+  await writeFile(join(dirname(realView), 'icon.json'), JSON.stringify(icon))
   show = async view => {
     const tmp = `${realView}.demo-tmp`
-    await writeFile(tmp, JSON.stringify({ ...view, icon }))
+    await writeFile(tmp, JSON.stringify(view))
     await rename(tmp, realView)
   }
   cleanup = async () => { if (backup) await writeFile(realView, backup) }
   console.log('驱动真实的状态栏鲸鱼（结束后恢复原状）。如果 DSH 里正有任务在跑，它会把演示盖掉。')
 } else {
   await mkdir(demoDir, { recursive: true })
-  const tray = await startTray({ stateDir: demoDir, onAction: id => console.log(`   （菜单点击：${id}）`), logger: console })
-  show = view => tray.update({ ...view, icon })
+  const tray = await startTray({ stateDir: demoDir, icon, onAction: id => console.log(`   （菜单点击：${id}）`), logger: console })
+  show = view => tray.update(view)
   cleanup = () => tray.stop()
   console.log('菜单栏里会多出一只演示用的鲸鱼（结束后消失）。macOS 26 放不下时会把它收进「«」里。')
 }
@@ -111,7 +112,7 @@ try {
   await notify('input', '这个文件叫什么名字？')
   await countdown(7)
 
-  say('⑤ 工作完成：弹出通知，鲸鱼回到安静状态；菜单第一行「空闲 · 今日已完成 1 个任务」，「最近结束」里有这条')
+  say('⑤ 工作完成：弹出通知，鲸鱼跳一下、撒星星（绿色几秒），然后回到安静状态；菜单里「最近结束」有这条')
   await show(view('completed'))
   await notify('completed', '任务已完成')
   await countdown(7)

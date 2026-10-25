@@ -65,7 +65,7 @@ test('host route feeds client notifications and click opens the session', async 
   const file = join(fileURLToPath(new URL('..', import.meta.url)), 'lib', 'client.js')
   vm.runInNewContext(readFileSync(file, 'utf8'), sandbox)
   const client = factory(() => { throw new Error('no require expected') })
-  assert.equal(client.inject.join(','), 'uiWorkspace,sessions')
+  assert.equal(client.inject.join(','), 'uiWorkspace,sessions,slots,locale,configForms')
   const cctx = {
     uiWorkspace: { openSession: id => opened.push(id) },
     sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
