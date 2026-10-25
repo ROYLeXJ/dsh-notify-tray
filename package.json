@@ -1,6 +1,6 @@
 {
   "name": "dsh-notify-tray",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DeepSeek Harness 通知 + 状态栏插件：任务完成、需要输入、需要选择时弹系统通知；在 macOS / Windows / Linux（含 UOS、Deepin、麒麟）状态栏常驻小图标，显示任务进度与花费。",
   "keywords": [
     "deepseek",
