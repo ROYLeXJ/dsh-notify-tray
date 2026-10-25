@@ -2,11 +2,11 @@
 
 [English](README.md) | **简体中文**
 
-DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、Linux。
+DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、Linux。同一个 npm 包，装上后按系统自动区分：macOS / Linux 有通知 + 状态栏小鲸鱼；Windows 没有状态栏，只有通知，设置页里也不会出现状态栏相关的选项。
 
 - **系统通知**：任务完成、任务失败、需要批准、需要你选择、需要你输入时弹系统通知，文案是小鲸鱼的口吻（比如「🐳 搞定啦～『写周报』做完了！快来验收」）。点击通知会跳到对应会话。
-- **状态栏小鲸鱼**：状态栏常驻一只小鲸鱼，用姿态告诉你现在的状态；下拉菜单里是正在运行的任务、等你处理的事项、今日用量和最近结束的任务，点一下就能跳到对应会话。
-- **插件设置页**：所有选项都能在 DSH「插件」页里直接改，包括当前模型的 API 价格和你买的套餐（Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / DeepSeek 或自定义），能从接口拿到的余额 / 剩余额度自动拿，拿不到的手填。
+- **状态栏小鲸鱼**（macOS / Linux）：状态栏常驻一只小鲸鱼，用姿态告诉你现在的状态；下拉菜单里是正在运行的任务、等你处理的事项、今日用量和最近结束的任务，点一下就能跳到对应会话。
+- **插件设置页**：所有选项都能在 DSH「插件」页里直接改（只显示当前系统用得上的选项），包括当前模型的 API 价格和你买的套餐（Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / DeepSeek 或自定义），能从接口拿到的余额 / 剩余额度自动拿，拿不到的手填。
 
 ![四种状态](assets/preview.svg)
 
@@ -17,7 +17,11 @@ DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、
 | 鼻子前冒出 `!` | 有事等你处理（批准 / 选择 / 输入） |
 | 鼻子前冒出 `×` | 刚有任务失败（默认保持 10 分钟） |
 
-macOS 上鲸鱼是菜单栏图标，颜色自动跟随菜单栏，旁边显示 `待处理 1` / `运行中 2` 这样的文字；Windows / Linux 上用颜色区分状态（🔵 空闲/运行中、🟠 等你处理、🔴 刚失败）。Windows 桌面版自带托盘图标，插件不再额外加一个，只提供通知。
+| 系统 | 通知 | 状态栏小鲸鱼 | 设置页里的状态栏选项 |
+|---|---|---|---|
+| macOS | 系统通知中心 | 菜单栏图标，颜色跟随菜单栏，旁边显示 `待处理 1` / `运行中 2` | 全部（显示开关、旁边显示什么、带上今日花费、失败保持时间） |
+| Linux（UOS / Deepin / 麒麟 / KDE 等） | freedesktop 通知 | 系统托盘图标，用颜色区分状态（🔵 空闲/运行中、🟠 等你处理、🔴 刚失败） | 显示开关、失败保持时间 |
+| Windows | 系统通知（右下角弹窗） | 无（Windows 没有状态栏） | 无 |
 
 ## 安装
 
@@ -34,7 +38,7 @@ dsh plugin --profile desktop add dsh-notify-tray
 # 或者 Web / 命令行 profile
 dsh plugin --profile web add dsh-notify-tray
 # 指定版本
-dsh plugin --profile desktop add dsh-notify-tray@0.1.0
+dsh plugin --profile desktop add dsh-notify-tray@0.1.2
 ```
 
 **方式三：从 Git 仓库装**（想用还没发版的最新代码时）
@@ -43,7 +47,11 @@ dsh plugin --profile desktop add dsh-notify-tray@0.1.0
 
 这条路**需要本机装有 Git**，没有 Git 会报 `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' 不是内部或外部命令`。Windows 先到 <https://git-scm.com/download/win> 下载安装（一路默认即可），装完重启 DSH；macOS 在终端里运行一次 `git --version`，按提示安装命令行工具即可。
 
-装好后重启 DSH。更新：`dsh plugin --profile desktop update dsh-notify-tray`。卸载：`dsh plugin --profile desktop remove dsh-notify-tray`。
+装好后重启 DSH。插件页上显示的版本号就是装上的版本，最新版见 [npm](https://www.npmjs.com/package/dsh-notify-tray)。
+
+> **装到的不是最新版？** 官方 npm 源连不上时，DSH 会退到 npmmirror（淘宝镜像）去装，镜像比官方源晚一点同步，刚发的新版可能还没到。等几分钟再更新，或指定版本 `dsh plugin --profile desktop add dsh-notify-tray@0.1.2`。
+
+更新：`dsh plugin --profile desktop update dsh-notify-tray`。卸载：`dsh plugin --profile desktop remove dsh-notify-tray`。
 
 ## 设置
 
@@ -69,10 +77,11 @@ dsh plugin --profile desktop add dsh-notify-tray@0.1.0
 | `notifyCompleted` / `notifyFailed` / `notifyApproval` / `notifyChoice` / `notifyInput` | 全部开启 | 分别控制五类通知 |
 | `channel` | `auto` | `auto`：有 DSH 窗口时由窗口弹，没有窗口时由系统弹 |
 | `suppressWhenFocused` | `true` | 你正在看这个会话时不弹通知（切到别的应用去就有了） |
-| `tray` | `true` | 是否显示状态栏图标（修改后重启生效） |
+| `sound` | `true` | 系统通知带提示音（macOS「叮」一声、Windows 通知音、Linux 视桌面环境而定） |
+| `tray` | `true` | 是否显示状态栏图标（macOS / Linux，修改后重启生效；Windows 忽略） |
 | `titleStyle` | `text` | macOS 菜单栏鲸鱼旁边显示什么：`text`（待处理 1 / 运行中 2）、`count`（只有数字）、`icon`（只有鲸鱼） |
 | `showSpendInTitle` | `false` | macOS 菜单栏文字里附带今日花费 |
-| `errorHoldMinutes` | `10` | 任务失败后图标保持红色的分钟数 |
+| `errorHoldMinutes` | `10` | 任务失败后图标保持红色 / 挂「×」的分钟数（macOS / Linux） |
 
 ### 花费与价格
 
@@ -119,13 +128,13 @@ dsh plugin --profile desktop add dsh-notify-tray@0.1.0
 | GPT | ChatGPT Go / Plus / Pro 5x / Pro 20x / Business、API 按量 | 普通 Key 无接口 |
 | MiniMax | M Plan Go / Explore / Build（国内 ¥49 / 119 / 469，国际 $22 / 55 / 132）、旧版 Coding Plan | 5 小时窗口剩余 `GET /v1/coding_plan/remains` |
 
-拿不到的信息就手填；留空也可以，留空的项不显示。状态栏菜单里会多一行「套餐 · 名称 · 价格 · 剩余」，子菜单里有余额、剩余额度、重置时间、接口返回的明细、「刷新额度」和用量页 / 价格页链接。
+拿不到的信息就手填；留空也可以，留空的项不显示。macOS / Linux 的状态栏菜单里会多一行「套餐 · 名称 · 价格 · 剩余」，子菜单里有余额、剩余额度、重置时间、接口返回的明细、「刷新额度」和用量页 / 价格页链接。
 
 ## 说明
 
 - **通知的触发时机**：任务跑完算「完成」；出错、超出 Token 上限、被拦截算「失败」；你自己点停止不弹通知。调用 `ask_user_question` 时，带选项的问题和计划审批算「需要选择」，不带选项的算「需要输入」；工具审批算「需要批准」。只跟踪顶层会话，子 agent 不单独弹通知。
 - **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费，会受平台扣费延迟影响）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日用量」子菜单里按模型分行显示。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
-- **点击托盘图标 / 通知 / 菜单里的「打开 DeepSeek Harness」**：有桌面版时唤起桌面版，没有时（`dsh web`）在浏览器里打开 Web 界面。浏览器里的通知需要先允许通知权限。
+- **点击通知 / 状态栏图标 / 菜单里的「打开 DeepSeek Harness」**：有桌面版时唤起桌面版，没有时（`dsh web`）在浏览器里打开 Web 界面。浏览器里的通知需要先允许通知权限。
 
 ## 已知限制
 

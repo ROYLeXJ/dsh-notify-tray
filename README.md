@@ -2,11 +2,11 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A notification + status-bar plugin for DeepSeek Harness (DSH). Works on macOS, Windows and Linux.
+A notification + status-bar plugin for DeepSeek Harness (DSH). Works on macOS, Windows and Linux. It is one npm package that adapts to the OS it is installed on: macOS / Linux get notifications plus the status-bar whale; Windows has no status bar, so it gets notifications only, and its settings page shows no status-bar options.
 
 - **System notifications** — when a task finishes, fails, needs approval, needs you to pick an option, or waits for your input, you get a native notification written in the voice of a little whale (e.g. *"🐳 All done! 'Write the weekly report' is finished — come check it out"*). Clicking a notification jumps straight to the session.
-- **Status-bar whale** — a small whale lives in your status bar and tells you what's going on through its posture. The drop-down menu lists running tasks, items waiting for you, today's usage and recently finished tasks; click any entry to open that session.
-- **Settings page** — every option can be changed directly on the DSH **Plugins** page, including the API price of the model you're currently using and the plan you subscribe to (Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / DeepSeek or custom). Balance and remaining quota are fetched automatically where the provider exposes an API; anything else can be filled in by hand.
+- **Status-bar whale** (macOS / Linux) — a small whale lives in your status bar and tells you what's going on through its posture. The drop-down menu lists running tasks, items waiting for you, today's usage and recently finished tasks; click any entry to open that session.
+- **Settings page** — every option can be changed directly on the DSH **Plugins** page (only the options your OS can use are shown), including the API price of the model you're currently using and the plan you subscribe to (Kimi / GLM / OpenCode / MiMo / Gemini / Grok / Claude / GPT / MiniMax / DeepSeek or custom). Balance and remaining quota are fetched automatically where the provider exposes an API; anything else can be filled in by hand.
 
 ![The four whale states](assets/preview.svg)
 
@@ -17,7 +17,11 @@ A notification + status-bar plugin for DeepSeek Harness (DSH). Works on macOS, W
 | A `!` bubble | Something is waiting for you (approval / choice / input) |
 | A `×` bubble | A task just failed (shown for 10 minutes by default) |
 
-On macOS the whale is a menu-bar icon that follows the menu-bar colour, with a short label next to it such as `Pending 1` / `Running 2`. On Windows / Linux the state is colour-coded instead (🔵 idle / running, 🟠 waiting for you, 🔴 just failed). The Windows desktop app already ships its own tray icon, so the plugin doesn't add a second one there — it only provides notifications.
+| OS | Notifications | Status-bar whale | Status-bar options on the settings page |
+|---|---|---|---|
+| macOS | Notification Center | Menu-bar icon following the menu-bar colour, with a label such as `Pending 1` / `Running 2` | All (show/hide, label style, today's spend in the label, failure hold time) |
+| Linux (UOS / Deepin / Kylin / KDE …) | freedesktop notifications | System-tray icon, colour-coded (🔵 idle / running, 🟠 waiting for you, 🔴 just failed) | Show/hide, failure hold time |
+| Windows | Toast notifications | None (Windows has no status bar) | None |
 
 ## Installation
 
@@ -34,7 +38,7 @@ dsh plugin --profile desktop add dsh-notify-tray
 # Or the web / CLI profile
 dsh plugin --profile web add dsh-notify-tray
 # Pin a specific version
-dsh plugin --profile desktop add dsh-notify-tray@0.1.0
+dsh plugin --profile desktop add dsh-notify-tray@0.1.2
 ```
 
 **Option 3 — from the Git repository** (latest unreleased code)
@@ -43,7 +47,11 @@ Paste `https://github.com/ROYLeXJ/dsh-notify-tray.git` into **Plugins → Add pl
 
 This route **requires Git**; without it you'll see `ERR_PNPM_GIT_RESOLVE_FAILED … 'git' is not recognized as an internal or external command`. On Windows install Git from <https://git-scm.com/download/win> (the defaults are fine) and restart DSH; on macOS run `git --version` once in Terminal and follow the prompt to install the command-line tools.
 
-Restart DSH after installing. To update: `dsh plugin --profile desktop update dsh-notify-tray`. To uninstall: `dsh plugin --profile desktop remove dsh-notify-tray`.
+Restart DSH after installing. The version on the plugin page is the one installed; the latest is listed on [npm](https://www.npmjs.com/package/dsh-notify-tray).
+
+> **Got an older version?** When the official npm registry is unreachable, DSH falls back to the npmmirror registry, which syncs a little later, so a just-published release may not be there yet. Update again in a few minutes, or pin the version: `dsh plugin --profile desktop add dsh-notify-tray@0.1.2`.
+
+To update: `dsh plugin --profile desktop update dsh-notify-tray`. To uninstall: `dsh plugin --profile desktop remove dsh-notify-tray`.
 
 ## Configuration
 
@@ -69,10 +77,11 @@ Every option can be changed under DSH **Plugins → Whale Notify Station → Con
 | `notifyCompleted` / `notifyFailed` / `notifyApproval` / `notifyChoice` / `notifyInput` | all on | Toggle each of the five notification kinds |
 | `channel` | `auto` | `auto`: the DSH window shows the notification when one is open, otherwise the OS does |
 | `suppressWhenFocused` | `true` | Don't notify while you're looking at that session (switch to another app and you will be) |
-| `tray` | `true` | Show the status-bar icon (takes effect after a restart) |
+| `sound` | `true` | Play a sound with system notifications (macOS chime, Windows toast sound, Linux where the desktop supports it) |
+| `tray` | `true` | Show the status-bar icon (macOS / Linux, takes effect after a restart; ignored on Windows) |
 | `titleStyle` | `text` | What to show next to the whale in the macOS menu bar: `text` (Pending 1 / Running 2), `count` (numbers only), `icon` (whale only) |
 | `showSpendInTitle` | `false` | Append today's spend to the macOS menu-bar label |
-| `errorHoldMinutes` | `10` | How many minutes the icon stays red after a task fails |
+| `errorHoldMinutes` | `10` | How many minutes the icon stays red / shows the `×` after a task fails (macOS / Linux) |
 
 ### Spend & pricing
 
@@ -119,13 +128,13 @@ Built-in plan presets (prices are the list prices at the time of writing and may
 | GPT | ChatGPT Go / Plus / Pro 5x / Pro 20x / Business, API pay-as-you-go | No endpoint for regular keys |
 | MiniMax | M Plan Go / Explore / Build (CN ¥49 / 119 / 469, intl. $22 / 55 / 132), legacy Coding Plan | 5-hour window remaining `GET /v1/coding_plan/remains` |
 
-Anything that can't be fetched can be typed in by hand; empty fields are simply hidden. The status-bar menu gains a **Plan · name · price · remaining** row whose submenu shows balance, remaining quota, reset time, the raw details returned by the endpoint, a **Refresh quota** action and links to the usage / pricing pages.
+Anything that can't be fetched can be typed in by hand; empty fields are simply hidden. On macOS / Linux the status-bar menu gains a **Plan · name · price · remaining** row whose submenu shows balance, remaining quota, reset time, the raw details returned by the endpoint, a **Refresh quota** action and links to the usage / pricing pages.
 
 ## Notes
 
 - **When notifications fire** — a task that runs to completion counts as *completed*; an error, hitting the token limit or being blocked counts as *failed*; stopping a task yourself doesn't notify. For `ask_user_question`, questions with options and plan approvals count as *needs a choice*, questions without options as *needs input*; tool approvals count as *needs approval*. Only top-level sessions are tracked — sub-agents don't get their own notifications.
 - **How spend is computed** — when signed in with a DeepSeek account, today's spend is accumulated from drops in the account balance (top-ups don't count as negative spend; subject to the platform's billing delay). In parallel, it's estimated from each `provider/model` route's tokens × unit price (price sources described under `priceSource` above); the **Today's usage** submenu breaks it down per model. The ledger lives in `~/.dsh/storages/dsh-notify-tray/ledger.json` and keeps 31 days.
-- **Clicking the tray icon / a notification / "Open DeepSeek Harness" in the menu** — brings up the desktop app when there is one, otherwise (`dsh web`) opens the web UI in the browser. Browser notifications require granting notification permission first.
+- **Clicking a notification / the status-bar icon / "Open DeepSeek Harness" in the menu** — brings up the desktop app when there is one, otherwise (`dsh web`) opens the web UI in the browser. Browser notifications require granting notification permission first.
 
 ## Development
 

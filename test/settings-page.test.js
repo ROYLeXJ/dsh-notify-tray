@@ -141,3 +141,76 @@ test('settings page: choosing a provider fills the plan preset and shows quota f
   assert.equal(fields().customPriceCurrency.text, 'USD')
   for (const dispose of disposers) dispose()
 })
+
+/** Mount the page with the host reporting `platform`, and return what it renders. */
+async function renderFor(platform, navigatorPlatform) {
+  let factory
+  const sandbox = {
+    window: { __ModuleLoader__: { load: ({ factory: f }) => { factory = f } }, navigator: navigatorPlatform ? { platform: navigatorPlatform } : undefined },
+    console, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
+    localStorage: { getItem: () => null, setItem() {} },
+    fetch: url => (platform === undefined
+      ? Promise.reject(new Error('offline'))
+      : Promise.resolve({ ok: true, json: () => Promise.resolve(url.startsWith('notify-tray/catalog') ? { providers: [] } : { platform, boot: 'b', seq: 0, focus: [], events: [] }) })),
+  }
+  vm.runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), sandbox)
+  const client = factory(name => ({ react: React, '@deepseek-ai/dsh-client-ui-primitives': ui })[name])
+  const registrations = []
+  const dictionaries = {}
+  const values = { tray: true, sound: true, channel: 'auto', titleStyle: 'text', spendSource: 'auto', currency: 'CNY', errorHoldMinutes: 10, planProvider: 'none' }
+  client.apply({
+    uiWorkspace: { openSession() {} },
+    sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
+    effect: fn => { fn() },
+    locale: { register: (ns, dict) => { dictionaries[ns] = dict; return () => {} }, bind: ns => key => dictionaries[ns]?.zh?.[key] ?? `?${key}` },
+    configForms: { get: () => ({ getSnapshot: () => ({ status: 'ready', writable: true, value: values }), subscribe: () => () => {} }), whileServed: (_ns, fn) => fn() },
+    slots: { inject: (_name, fn) => fn(), register: (options, Component) => { registrations.push({ options, Component }); return () => {} } },
+  })
+  if (platform !== undefined) await client.__settingsLive.loadState()
+  const { options, Component } = registrations[0]
+  const face = options.inject()
+  const zh = dictionaries[options.locale].zh
+  const props = { t: key => zh[key] ?? `?${key}`, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }
+  const nodes = collect(render(Component(props)))
+  const labels = nodes.filter(n => n.type === 'Switch' || n.type === 'SegmentedControl' || n.type === 'SettingsValueField').map(n => n.props.label)
+  const texts = JSON.stringify(nodes.map(n => [n.props.hint, ...n.children.filter(c => typeof c === 'string')]))
+  return { zh, labels, texts, summary: Component({ ...props, view: 'summary' }), platform: client.__settingsLive.currentPlatform() }
+}
+
+test('settings page on Windows: no status-bar section at all', async () => {
+  const { zh, labels, texts, summary, platform } = await renderFor('win32')
+  assert.equal(platform, 'win32')
+  for (const key of ['tray', 'titleStyle', 'showSpendInTitle', 'errorHoldMinutes']) assert.ok(!labels.includes(zh[key]), `${key} hidden`)
+  assert.ok(!texts.includes(zh.sectionTray), 'no status-bar section title')
+  assert.ok(labels.includes(zh.sound) && texts.includes(zh.soundHint_win32), 'sound explained for Windows')
+  assert.equal(summary, zh.summary_win32)
+  assert.ok(!summary.includes('状态栏里显示什么'))
+})
+
+test('settings page on Linux: tray toggle and failure hold, no menu-bar label options', async () => {
+  const { zh, labels, texts } = await renderFor('linux')
+  assert.ok(labels.includes(zh.tray) && texts.includes(zh.trayHint_linux))
+  assert.ok(labels.includes(zh.errorHoldMinutes_linux))
+  assert.ok(!labels.includes(zh.titleStyle) && !labels.includes(zh.showSpendInTitle))
+})
+
+test('settings page on macOS: the whole status-bar section', async () => {
+  const { zh, labels, texts } = await renderFor('darwin')
+  for (const key of ['tray', 'titleStyle', 'showSpendInTitle', 'errorHoldMinutes']) assert.ok(labels.includes(zh[key]), `${key} shown`)
+  assert.ok(texts.includes(zh.soundHint_darwin))
+})
+
+test('settings page guesses the OS from the browser until the host answers', async () => {
+  assert.equal((await renderFor(undefined, 'Win32')).platform, 'win32')
+  assert.equal((await renderFor(undefined, 'MacIntel')).platform, 'darwin')
+  assert.equal((await renderFor(undefined, 'Linux x86_64')).platform, 'linux')
+  const unknown = await renderFor(undefined)
+  assert.equal(unknown.platform, undefined)
+  assert.ok(unknown.labels.includes(unknown.zh.titleStyle), 'unknown OS shows everything')
+})
+
+test('host: no status-bar whale on Windows', async () => {
+  const { TRAY_PLATFORMS } = await import('../lib/index.js')
+  assert.equal(TRAY_PLATFORMS.has('win32'), false)
+  assert.ok(TRAY_PLATFORMS.has('darwin') && TRAY_PLATFORMS.has('linux'))
+})
