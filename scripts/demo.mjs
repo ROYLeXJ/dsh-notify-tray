@@ -76,13 +76,13 @@ if (live) {
     await rename(tmp, realView)
   }
   cleanup = async () => { if (backup) await writeFile(realView, backup) }
-  console.log('驱动真实的状态栏大肥鱼（结束后恢复原状）。如果 DSH 里正有任务在跑，它会把演示盖掉。')
+  console.log('驱动真实的状态栏鲸鱼（结束后恢复原状）。如果 DSH 里正有任务在跑，它会把演示盖掉。')
 } else {
   await mkdir(demoDir, { recursive: true })
   const tray = await startTray({ stateDir: demoDir, icon, onAction: id => console.log(`   （菜单点击：${id}）`), logger: console })
   show = view => tray.update(view)
   cleanup = () => tray.stop()
-  console.log('菜单栏里会多出一只演示用的大肥鱼（结束后消失）。macOS 26 放不下时会把它收进「«」里。')
+  console.log('菜单栏里会多出一只演示用的鲸鱼（结束后消失）。macOS 26 放不下时会把它收进「«」里。')
 }
 
 const view = (kind, now = Date.now()) => buildView(tasks(kind, now), usage, cfg, now)
@@ -94,11 +94,11 @@ const notify = async (type, body) => {
 }
 
 try {
-  say('① 空闲：大肥鱼安静待着，旁边没有文字；菜单第一行「空闲，等你派活」')
+  say('① 空闲：鲸鱼安静待着，旁边没有文字；菜单第一行「空闲，等你派活」')
   await show(view('idle'))
   await countdown(5)
 
-  say('② 工作中：大肥鱼摆尾游泳、鼻子前冒泡泡（12 帧循环），旁边「运行中 1」；菜单里是「演示任务 · 3 分钟 · bash」')
+  say('② 工作中：鲸鱼摆尾游泳、鼻子前冒泡泡（12 帧循环），旁边「运行中 1」；菜单里是「演示任务 · 3 分钟 · bash」')
   await show(view('running'))
   await countdown(6)
 
@@ -112,7 +112,7 @@ try {
   await notify('input', '这个文件叫什么名字？')
   await countdown(7)
 
-  say('⑤ 工作完成：弹出通知，大肥鱼跳一下、撒星星（绿色几秒），然后回到安静状态；菜单里「最近结束」有这条')
+  say('⑤ 工作完成：弹出通知，鲸鱼跳一下、撒星星（绿色几秒），然后回到安静状态；菜单里「最近结束」有这条')
   await show(view('completed'))
   await notify('completed', '任务已完成')
   await countdown(7)
