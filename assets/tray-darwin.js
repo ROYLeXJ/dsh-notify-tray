@@ -153,8 +153,9 @@ function run(argv) {
    * Read-only rows (balance, usage, …) are disabled so they never highlight or
    * fire, but AppKit draws a disabled title at a very low alpha, which made
    * them hard to read. A disabled item with a custom view is still inert, yet
-   * its view is drawn as-is: a plain NSTextField in secondaryLabelColor keeps
-   * the text legible while staying visibly dimmer than the actionable items.
+   * its view is drawn as-is: a plain NSTextField in labelColor (solid black in
+   * light mode, white in dark mode) reads exactly like the actionable items,
+   * minus the hover highlight and the click.
    */
   function infoView(label) {
     var field = $.NSTextField.alloc.initWithFrame($.NSMakeRect(INFO_INSET, 0, 200, INFO_ROW_H))
@@ -163,7 +164,7 @@ function run(argv) {
     field.editable = false
     field.selectable = false
     field.font = $.NSFont.menuFontOfSize(0)
-    field.textColor = $.NSColor.secondaryLabelColor
+    field.textColor = $.NSColor.labelColor
     field.stringValue = $(label)
     field.sizeToFit
     var size = field.frame.size
