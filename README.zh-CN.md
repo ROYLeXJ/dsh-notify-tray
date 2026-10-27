@@ -86,7 +86,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.3
 | `channel` | `auto` | `auto`：有 DSH 窗口时由窗口弹，没有窗口时由系统弹 |
 | `suppressWhenFocused` | `true` | 你正在看这个会话时不弹通知（切到别的应用去就有了） |
 | `sound` | `true` | 系统通知带提示音（macOS「叮」一声、Windows 通知音、Linux 视桌面环境而定） |
-| `tray` | `true` | 是否显示状态栏图标（macOS / Linux，修改后重启生效；Windows 忽略） |
+| `tray` | `true` | 是否显示状态栏图标（macOS / Linux，保存后立即生效；Windows 忽略）。在状态栏菜单里点「隐藏状态栏图标」后，可在插件设置页点「重新显示状态栏图标」把它找回来，不用重启 DSH |
 | `titleStyle` | `text` | macOS 菜单栏鲸鱼旁边显示什么：`text`（待处理 1 / 运行中 2）、`count`（只有数字）、`icon`（只有鲸鱼） |
 | `showSpendInTitle` | `false` | macOS 菜单栏文字里附带今日花费 |
 | `errorHoldMinutes` | `10` | 任务失败后图标保持红色 / 挂「×」的分钟数（macOS / Linux） |
@@ -95,7 +95,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.3
 
 | 选项 | 默认值 | 说明 |
 |---|---|---|
-| `spendSource` | `auto` | 有 DeepSeek 账户余额时用余额扣费，否则按价格估算 |
+| `spendSource` | `auto` | 有 DeepSeek 账户余额时用余额扣费，否则按价格估算。`auto` 下余额扣费落后于 DeepSeek 模型的估算时（平台扣费有延迟），先按估算显示，余额追上后再改回余额；其它平台模型的花费始终按估算加上 |
 | `currency` | `CNY` | 显示币种 |
 | `balancePollMinutes` | `5` | DeepSeek 账户余额刷新间隔（分钟） |
 | `priceSource` | `auto` | 估算用哪个价：`auto`（价格表 → 自定义价 → DSH 自带的模型目录价 → 插件内置价）、`catalog`、`custom` |
@@ -104,7 +104,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.3
 | `exchangeRate` | `7.2` | 1 美元 = ? 人民币；目录价是美元，显示人民币时按它换算 |
 | `prices` | `{}` | 按模型的价格表，优先级最高 |
 
-「当前 API 价格」区域会显示你正在用的模型（provider / model）和它的目录价：DSH 的 pi-ai 适配器自带一份模型目录（Claude、GPT、Gemini、Grok、Groq、Kimi、GLM、MiMo、MiniMax、OpenCode Go、DeepSeek 等），插件直接读它，拿不到的再用内置价或你填的自定义价。一键「把目录价填进自定义价」可以在目录价的基础上改。
+「当前 API 价格」区域会显示你正在用的模型（provider / model）和它的目录价：DSH 的 pi-ai 适配器自带一份模型目录（Claude、GPT、Gemini、Grok、Groq、Kimi、GLM、MiMo、MiniMax、OpenCode Go、DeepSeek 等），插件直接读它，拿不到的再用内置价或你填的自定义价。桌面版和 `dsh web`（含 `~/.npm-global` 等全局 npm 安装）都会自动找到这份目录；如果设置页提示没找到，可以设置环境变量 `DSH_NOTIFY_TRAY_PI_AI` 指向 DSH 的安装目录（例如 `~/.npm-global/lib/node_modules/@deepseek-ai/dsh`）后重启。一键「把目录价填进自定义价」可以在目录价的基础上改。
 
 ### 套餐
 
@@ -141,9 +141,9 @@ dsh plugin --profile web add dsh-notify-tray@0.1.3
 ## 说明
 
 - **通知的触发时机**：任务跑完算「完成」；出错、超出 Token 上限、被拦截算「失败」；你自己点停止不弹通知。调用 `ask_user_question` 时，带选项的问题和计划审批算「需要选择」，不带选项的算「需要输入」；工具审批算「需要批准」。只跟踪顶层会话，子 agent 不单独弹通知。
-- **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费，会受平台扣费延迟影响）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日用量」子菜单里按模型分行显示。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
+- **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费；平台扣费有延迟，`auto` 下余额没跟上时先按估算显示）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日用量」子菜单里按模型分行显示。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
 - **点击通知 / 状态栏图标 / 菜单里的「打开 DeepSeek Harness」**：有桌面版时唤起桌面版，没有时（`dsh web`）在浏览器里打开 Web 界面。浏览器里的通知需要先允许通知权限。
 
 ## 已知限制
 
-- 只在 macOS 和 Windows 上完成了验证，Linux 上还没有完成验证。
+- macOS、Windows、Linux 均已完成验证（Linux 在 web profile 下验证了通知与系统托盘）。

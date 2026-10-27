@@ -86,7 +86,7 @@ Every option can be changed under DSH **Plugins → Whale Notify Station → Con
 | `channel` | `auto` | `auto`: the DSH window shows the notification when one is open, otherwise the OS does |
 | `suppressWhenFocused` | `true` | Don't notify while you're looking at that session (switch to another app and you will be) |
 | `sound` | `true` | Play a sound with system notifications (macOS chime, Windows toast sound, Linux where the desktop supports it) |
-| `tray` | `true` | Show the status-bar icon (macOS / Linux, takes effect after a restart; ignored on Windows) |
+| `tray` | `true` | Show the status-bar icon (macOS / Linux, takes effect as soon as you save; ignored on Windows). After **Hide status-bar icon** in the tray menu, **Show the status-bar icon again** on the settings page brings it back without restarting DSH |
 | `titleStyle` | `text` | What to show next to the whale in the macOS menu bar: `text` (Pending 1 / Running 2), `count` (numbers only), `icon` (whale only) |
 | `showSpendInTitle` | `false` | Append today's spend to the macOS menu-bar label |
 | `errorHoldMinutes` | `10` | How many minutes the icon stays red / shows the `×` after a task fails (macOS / Linux) |
@@ -95,7 +95,7 @@ Every option can be changed under DSH **Plugins → Whale Notify Station → Con
 
 | Option | Default | Description |
 |---|---|---|
-| `spendSource` | `auto` | Use the DeepSeek account balance when available, otherwise estimate from prices |
+| `spendSource` | `auto` | Use the DeepSeek account balance when available, otherwise estimate from prices. In `auto`, while balance drops lag behind the DeepSeek models' estimate (the platform bills with a delay) the estimate is shown until the balance catches up; other providers' models are always added as an estimate |
 | `currency` | `CNY` | Display currency |
 | `balancePollMinutes` | `5` | How often (minutes) to refresh the DeepSeek account balance |
 | `priceSource` | `auto` | Which price to estimate with: `auto` (price table → custom price → DSH's built-in model catalog → plugin's built-in prices), `catalog`, `custom` |
@@ -104,7 +104,7 @@ Every option can be changed under DSH **Plugins → Whale Notify Station → Con
 | `exchangeRate` | `7.2` | 1 USD = ? CNY; catalog prices are in USD and converted when displaying CNY |
 | `prices` | `{}` | Per-model price table, highest priority |
 
-The **Current API price** section shows the model you're using (provider / model) and its catalog price. DSH's pi-ai adapter ships a model catalog (Claude, GPT, Gemini, Grok, Groq, Kimi, GLM, MiMo, MiniMax, OpenCode Go, DeepSeek, …); the plugin reads it directly and falls back to its built-in prices or your custom price when a model is missing. A one-click **Copy catalog price into custom price** lets you tweak from the catalog value.
+The **Current API price** section shows the model you're using (provider / model) and its catalog price. DSH's pi-ai adapter ships a model catalog (Claude, GPT, Gemini, Grok, Groq, Kimi, GLM, MiMo, MiniMax, OpenCode Go, DeepSeek, …); the plugin reads it directly and falls back to its built-in prices or your custom price when a model is missing. It is found automatically for the desktop app and for `dsh web` (including global npm installs such as `~/.npm-global`); if the settings page says it wasn't found, set the `DSH_NOTIFY_TRAY_PI_AI` environment variable to the DSH install directory (e.g. `~/.npm-global/lib/node_modules/@deepseek-ai/dsh`) and restart. A one-click **Copy catalog price into custom price** lets you tweak from the catalog value.
 
 ### Plans
 
@@ -141,7 +141,7 @@ Anything that can't be fetched can be typed in by hand; empty fields are simply 
 ## Notes
 
 - **When notifications fire** — a task that runs to completion counts as *completed*; an error, hitting the token limit or being blocked counts as *failed*; stopping a task yourself doesn't notify. For `ask_user_question`, questions with options and plan approvals count as *needs a choice*, questions without options as *needs input*; tool approvals count as *needs approval*. Only top-level sessions are tracked — sub-agents don't get their own notifications.
-- **How spend is computed** — when signed in with a DeepSeek account, today's spend is accumulated from drops in the account balance (top-ups don't count as negative spend; subject to the platform's billing delay). In parallel, it's estimated from each `provider/model` route's tokens × unit price (price sources described under `priceSource` above); the **Today's usage** submenu breaks it down per model. The ledger lives in `~/.dsh/storages/dsh-notify-tray/ledger.json` and keeps 31 days.
+- **How spend is computed** — when signed in with a DeepSeek account, today's spend is accumulated from drops in the account balance (top-ups don't count as negative spend; the platform bills with a delay, so in `auto` the estimate stands in until the balance catches up). In parallel, it's estimated from each `provider/model` route's tokens × unit price (price sources described under `priceSource` above); the **Today's usage** submenu breaks it down per model. The ledger lives in `~/.dsh/storages/dsh-notify-tray/ledger.json` and keeps 31 days.
 - **Clicking a notification / the status-bar icon / "Open DeepSeek Harness" in the menu** — brings up the desktop app when there is one, otherwise (`dsh web`) opens the web UI in the browser. Browser notifications require granting notification permission first.
 
 ## Development
@@ -170,7 +170,7 @@ Requires Node ≥ 20. Linux uses [`dbus-next`](https://www.npmjs.com/package/dbu
 
 ## Known limitations
 
-- Verified on macOS and Windows only; Linux has not been fully verified yet.
+- Verified on macOS, Windows and Linux (Linux verified under the web profile: notifications and the system tray).
 
 ## License
 

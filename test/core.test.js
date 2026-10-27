@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildView, elapsed, money } from '../lib/format.js'
+import { buildView, elapsed, money, spendOf, wrapText } from '../lib/format.js'
 import { asciiIcon, renderIcon } from '../lib/icon.js'
 import { flatten, iconSpec, whaleFrames, whalePaths, whaleSvg } from '../lib/whale.js'
-import { Ledger, priceFor } from '../lib/ledger.js'
+import { billedToDeepseek, Ledger, priceFor } from '../lib/ledger.js'
 import { classifyQuestion, Tracker } from '../lib/tracker.js'
 
 const session = (id, header = {}) => ({ id, header: { cwd: '/work/demo', ...header } })
@@ -232,4 +232,48 @@ test('windows: toast XML escapes text and launches dsh://open only when asked', 
   const quiet = toastXml({ title: 't', body: 'b', sound: false })
   assert.ok(quiet.startsWith('<toast><visual>'), 'no activation without a launch target')
   assert.ok(quiet.includes('<audio silent="true"/>'))
+})
+
+test('spend: auto follows the estimate while balance drops lag, and adds other providers on top', () => {
+  const base = { currency: 'CNY', balance: 50, estimateSources: ['static'] }
+  // First day: the platform has booked ¥0.28 of ¥0.77 worth of DeepSeek usage so far.
+  const lag = spendOf({ ...base, balanceSpend: 0.28, estimate: 0.77, estimateDeepseek: 0.77 }, 'auto')
+  assert.equal(lag.value, 0.77)
+  assert.match(lag.label, /未到账/)
+  // Caught up: the balance wins.
+  const caught = spendOf({ ...base, balanceSpend: 0.8, estimate: 0.77, estimateDeepseek: 0.77 }, 'auto')
+  assert.deepEqual([caught.value, caught.label], [0.8, '余额扣费'])
+  // Kimi usage never shows up in the DeepSeek balance.
+  const mixed = spendOf({ ...base, balanceSpend: 1, estimate: 1.5, estimateDeepseek: 0.9 }, 'auto')
+  assert.equal(mixed.value, 1.6)
+  assert.match(mixed.label, /其它平台估算/)
+  assert.equal(spendOf({ ...base, balanceSpend: 0.28, estimate: 0.77, estimateDeepseek: 0.77 }, 'balance').value, 0.28)
+  assert.equal(spendOf({ ...base, balanceSpend: 0.28, estimate: 0.77, estimateDeepseek: 0.77 }, 'estimate').value, 0.77)
+})
+
+test('ledger: estimateDeepseek counts only routes billed to the DeepSeek balance', () => {
+  assert.equal(billedToDeepseek('deepseek-account/deepseek-flash'), true)
+  assert.equal(billedToDeepseek('kimi-coding/kimi-for-coding'), false)
+  assert.equal(billedToDeepseek('deepseek-v4-pro'), true)
+  assert.equal(billedToDeepseek('unknown'), false)
+})
+
+test('view: submenu rows stay short enough not to run off the screen edge', () => {
+  const now = 1_000_000
+  const tasks = { running: 0, runningList: [], waiting: [], recent: [], today: { completed: 0, failed: 0, aborted: 0 } }
+  const usage = {
+    tokens: { input: 7_900_000, cacheRead: 0, cacheWrite: 0, output: 49_000, total: 7_949_000 },
+    byModel: [{ key: 'deepseek-official/deepseek-flash', provider: 'deepseek-official', model: 'deepseek-flash', tokens: { input: 7_900_000, cacheRead: 0, cacheWrite: 0, output: 26_000 }, cost: 0.94, source: 'static' }],
+    estimate: 0.94, estimateDeepseek: 0.94, estimateSources: ['static'], balance: 189.4, balanceSpend: 0.94, currency: 'CNY',
+    route: { provider: 'deepseek-official', model: 'deepseek-flash' },
+  }
+  const plan = { name: 'Kimi', lines: [], quotaText: 'Kimi Code 5 小时滚动窗口 + 月度共享额度池；年付 ¥948；含 1M 上下文与 HighSpeed 以及更多更多说明文字', links: {}, providerName: 'Kimi' }
+  const v = buildView(tasks, usage, { spendSource: 'auto' }, now, plan)
+  const subRows = v.menu.filter(r => r.children).flatMap(r => r.children)
+  for (const row of subRows) assert.ok(row.label.length <= 36, `too long: ${row.label}`)
+  const today = v.menu.find(r => r.id === 'today').children.map(r => r.label)
+  assert.ok(today.includes('deepseek-flash · 792.6万 · ¥0.94 内置价'))
+  assert.ok(today.includes('当前模型 deepseek-flash'))
+  assert.ok(!today.some(l => l.startsWith('按价格估算')), 'no duplicate estimate row when it equals the spend')
+  assert.deepEqual(wrapText('a；b', 36), ['a；b'])
 })
