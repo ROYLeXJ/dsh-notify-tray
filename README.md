@@ -27,19 +27,19 @@ A notification + status-bar plugin for DeepSeek Harness (DSH). Works on macOS, W
 
 The plugin is published on npm as [`dsh-notify-tray`](https://www.npmjs.com/package/dsh-notify-tray). Installing from npm needs nothing beyond DSH itself — no Git required.
 
-> **⚠️ To get the latest release, include the version number**, e.g. `dsh-notify-tray@0.1.3` (the latest version is listed on [npm](https://www.npmjs.com/package/dsh-notify-tray)).
+> **⚠️ To get the latest release, include the version number**, e.g. `dsh-notify-tray@0.1.4` (the latest version is listed on [npm](https://www.npmjs.com/package/dsh-notify-tray)).
 > DSH installs plugins with pnpm, whose supply-chain policy (`minimumReleaseAge`) won't auto-install a release that is still inside its waiting period. With a bare `dsh-notify-tray` you may get an older version (e.g. 0.1.0). If an older version is already installed, remove it first, then install with the version number.
 
 **Option 1 — from inside DSH (recommended)**
-Open DSH **Plugins → Add plugin**, type `dsh-notify-tray@0.1.3` (with the version number) into the input box and click **Install**.
+Open DSH **Plugins → Add plugin**, type `dsh-notify-tray@0.1.4` (with the version number) into the input box and click **Install**.
 
 **Option 2 — command line**
 
 ```sh
 # Desktop app (the dsh command bundled with the app); include the version to get the latest
-dsh plugin --profile desktop add dsh-notify-tray@0.1.3
+dsh plugin --profile desktop add dsh-notify-tray@0.1.4
 # Or the web / CLI profile
-dsh plugin --profile web add dsh-notify-tray@0.1.3
+dsh plugin --profile web add dsh-notify-tray@0.1.4
 ```
 
 **Option 3 — from the Git repository** (latest unreleased code)
@@ -54,7 +54,7 @@ Restart DSH after installing. The version on the plugin page is the one installe
 >
 > ```sh
 > dsh plugin --profile desktop remove dsh-notify-tray
-> dsh plugin --profile desktop add dsh-notify-tray@0.1.3
+> dsh plugin --profile desktop add dsh-notify-tray@0.1.4
 > ```
 >
 > Also, when the official npm registry is unreachable, DSH falls back to the npmmirror registry, which syncs a little later, so a just-published release may take a few minutes to appear there.
