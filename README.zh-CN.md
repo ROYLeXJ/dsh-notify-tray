@@ -27,19 +27,19 @@ DeepSeek Harness（DSH）的通知 + 状态栏插件，支持 macOS、Windows、
 
 插件已发布到 npm：[`dsh-notify-tray`](https://www.npmjs.com/package/dsh-notify-tray)。从 npm 安装只需要 DSH 本身，**不需要装 Git**。
 
-> **⚠️ 想装最新版，请带上版本号**，例如 `dsh-notify-tray@0.1.4`（最新版本号见 [npm](https://www.npmjs.com/package/dsh-notify-tray)）。
+> **⚠️ 想装最新版，请带上版本号**，例如 `dsh-notify-tray@0.1.5`（最新版本号见 [npm](https://www.npmjs.com/package/dsh-notify-tray)）。
 > DSH 用 pnpm 安装插件，pnpm 的供应链安全策略（`minimumReleaseAge`）不会自动安装刚发布、还没过观察期的版本，只写 `dsh-notify-tray` 时会退回装一个旧版本（例如 0.1.0）。已经装了旧版的，先卸载，再带版本号安装。
 
 **方式一：在 DSH 里装（推荐）**
-打开 DSH「插件 → 添加插件」，输入框里填 `dsh-notify-tray@0.1.4`（带上版本号），点「安装」。
+打开 DSH「插件 → 添加插件」，输入框里填 `dsh-notify-tray@0.1.5`（带上版本号），点「安装」。
 
 **方式二：命令行**
 
 ```sh
 # 桌面版（App 内置的 dsh 命令），带上版本号才能装到最新版
-dsh plugin --profile desktop add dsh-notify-tray@0.1.4
+dsh plugin --profile desktop add dsh-notify-tray@0.1.5
 # 或者 Web / 命令行 profile
-dsh plugin --profile web add dsh-notify-tray@0.1.4
+dsh plugin --profile web add dsh-notify-tray@0.1.5
 ```
 
 **方式三：从 Git 仓库装**（想用还没发版的最新代码时）
@@ -54,7 +54,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.4
 >
 > ```sh
 > dsh plugin --profile desktop remove dsh-notify-tray
-> dsh plugin --profile desktop add dsh-notify-tray@0.1.4
+> dsh plugin --profile desktop add dsh-notify-tray@0.1.5
 > ```
 >
 > 另外，官方 npm 源连不上时 DSH 会退到 npmmirror（淘宝镜像），镜像比官方源晚一点同步，刚发的新版可能要等几分钟才到。
