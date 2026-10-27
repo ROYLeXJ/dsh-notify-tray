@@ -12,7 +12,7 @@ const React = {
 }
 const named = name => Object.assign(function Component() {}, { displayName: name })
 const ui = {
-  Switch: named('Switch'), SegmentedControl: named('SegmentedControl'), Tag: named('Tag'),
+  Switch: named('Switch'), Checkbox: named('Checkbox'), SegmentedControl: named('SegmentedControl'), Tag: named('Tag'),
   SettingsForm: named('SettingsForm'), SettingsValueField: named('SettingsValueField'),
   settingsNumberField: field => ({ field, format: v => (typeof v === 'number' ? String(v) : ''), parse: t => (t.trim() === '' ? { kind: 'clear' } : { kind: 'set', value: Number(t) }) }),
   settingsTextField: field => ({ field, format: v => (typeof v === 'string' ? v : ''), parse: t => (t.trim() === '' ? { kind: 'clear' } : { kind: 'set', value: t.trim() }) }),
@@ -64,14 +64,27 @@ test('settings page registers into plugins.bundle.config only and renders every 
   const props = { t, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }
 
   assert.equal(Component({ ...props, view: 'summary' }), dictionaries[options.locale].zh.summary)
-  const tree = render(Component(props))
-  const nodes = collect(tree)
-  // With no plan provider chosen the plan section only shows the provider picker.
-  assert.equal(nodes.filter(n => n.type === 'Switch').length, 9, 'nine toggles')
-  assert.equal(nodes.filter(n => n.type === 'SegmentedControl').length, 6, 'six segmented choices')
-  assert.equal(nodes.filter(n => n.type === 'SettingsValueField').length, 6, 'six value fields')
-  assert.equal(nodes.filter(n => n.type === 'select').length, 1, 'provider picker')
+  // Folded: the first screen is the five notify checkboxes, sound, the whale, its label and the plan picker.
+  const count = (nodes, type) => nodes.filter(n => n.type === type).length
+  let nodes = collect(render(Component(props)))
+  assert.equal(count(nodes, 'Checkbox'), 5, 'five notify checkboxes in one row')
+  assert.equal(count(nodes, 'Switch'), 2, 'sound + tray')
+  assert.equal(count(nodes, 'SegmentedControl'), 1, 'menu-bar label style')
+  assert.equal(count(nodes, 'SettingsValueField'), 0, 'no value fields on the first screen')
+  assert.equal(count(nodes, 'select'), 1, 'provider picker')
   assert.ok(nodes.every(n => !JSON.stringify(n.props).includes('"?')), 'every label has a translation')
+  const input = nodes.find(n => n.type === 'Checkbox' && n.props.label === dictionaries[options.locale].zh.notifyInput)
+  assert.equal(input.props.checked, false)
+  input.props.onChange(true)
+  assert.equal(face.hooks.notifyTray.getSnapshot().fields.notifyInput.text, 'on')
+  // Unfolded: every other option is still there.
+  client.__settingsLive.open.advanced = true
+  nodes = collect(render(Component(props)))
+  assert.equal(count(nodes, 'Switch'), 4, 'plus quiet-while-focused + spend in title')
+  assert.equal(count(nodes, 'SegmentedControl'), 6, 'plus channel, spend source, currency, price source, custom currency')
+  assert.equal(count(nodes, 'SettingsValueField'), 6, 'failure hold, balance poll, three custom prices, exchange rate')
+  assert.ok(nodes.every(n => !JSON.stringify(n.props).includes('"?')), 'every label has a translation')
+  client.__settingsLive.open.advanced = false
   const sound = nodes.find(n => n.type === 'Switch' && n.props.label === dictionaries[options.locale].zh.sound)
   assert.equal(sound.props.checked, true)
   sound.props.onChange(false)
@@ -113,15 +126,21 @@ test('settings page: choosing a provider fills the plan preset and shows quota f
   client.__settingsLive.loadCatalog()
   await client.__settingsLive.loadState()
   await new Promise(resolve => setTimeout(resolve, 0))
+  client.__settingsLive.open.advanced = true
+  client.__settingsLive.open.plan = true
   const nodes = collect(render(Component(props)))
   assert.ok(nodes.every(n => !JSON.stringify(n.props).includes('"?')), 'every label has a translation')
   const selects = nodes.filter(n => n.type === 'select')
   assert.equal(selects.length, 2, 'provider + plan pickers')
   const text = JSON.stringify(nodes.map(n => n.children.filter(c => typeof c === 'string')))
   assert.ok(text.includes('kimi-coding / kimi-for-coding'), 'current model shown')
-  assert.ok(text.includes('$0.95 / $0.19 / $4'), 'listed price shown')
+  assert.ok(text.includes('¥6.84 / ¥1.37 / ¥28.8'), 'effective price shown')
+  assert.ok(text.includes('$0.95 / $0.19 / $4'), 'listed price beside the copy button')
   assert.ok(text.includes('额度 剩余 680 / 1000'), 'fetched quota lines shown')
-  assert.ok(text.includes('https://api.kimi.com/coding/v1/usages'), 'quota endpoint shown')
+  assert.ok(text.includes('剩余 68%'), 'remaining quota in the status line')
+  const quotaUrl = nodes.find(n => n.type === 'SettingsValueField' && n.props.id === 'notify-tray-planQuotaUrl')
+  assert.equal(quotaUrl.props.placeholder, 'https://api.kimi.com/coding/v1/usages', 'quota endpoint shown')
+  assert.ok(nodes.some(n => n.type === 'SettingsValueField' && n.props.id === 'notify-tray-planName'), 'plan details unfold')
   // Picking the preset stages its figures; every field stays editable.
   selects[1].props.onChange({ target: { value: 'allegro' } })
   const fields = () => face.hooks.notifyTray.getSnapshot().fields
@@ -139,6 +158,8 @@ test('settings page: choosing a provider fills the plan preset and shows quota f
   copy.props.onClick()
   assert.equal(fields().customInput.text, '0.95')
   assert.equal(fields().customPriceCurrency.text, 'USD')
+  client.__settingsLive.open.advanced = false
+  client.__settingsLive.open.plan = false
   for (const dispose of disposers) dispose()
 })
 
@@ -171,6 +192,8 @@ async function renderFor(platform, navigatorPlatform) {
   const face = options.inject()
   const zh = dictionaries[options.locale].zh
   const props = { t: key => zh[key] ?? `?${key}`, view: 'page', useNotifyTray: select => select(face.hooks.notifyTray.getSnapshot()), ...face }
+  // Platform checks look at every option, folded or not.
+  client.__settingsLive.open.advanced = true
   const nodes = collect(render(Component(props)))
   const labels = nodes.filter(n => n.type === 'Switch' || n.type === 'SegmentedControl' || n.type === 'SettingsValueField').map(n => n.props.label)
   const texts = JSON.stringify(nodes.map(n => [n.props.hint, ...n.children.filter(c => typeof c === 'string')]))

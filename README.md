@@ -63,7 +63,7 @@ To update: include the version here too — `dsh plugin --profile desktop remove
 
 ## Configuration
 
-Every option can be changed under DSH **Plugins → Whale Notify Station → Configure**, or written into the profile's `cordis.patch.yml`:
+Every option can be changed on DSH's **Plugins → Whale Notify Station** page, or written into the profile's `cordis.patch.yml`. The page's first screen holds only the everyday options (which events notify, sound, the status-bar whale, a today's-spend card, your plan and its quota lookup); notification channel, spend method, custom prices, exchange rate and refresh intervals sit under a folded **Advanced** section at the bottom, tagged with how many of them you have changed.
 
 ```yaml
 - id: notify-tray
@@ -136,12 +136,12 @@ Built-in plan presets (prices are the list prices at the time of writing and may
 | GPT | ChatGPT Go / Plus / Pro 5x / Pro 20x / Business, API pay-as-you-go | No endpoint for regular keys |
 | MiniMax | M Plan Go / Explore / Build (CN ¥49 / 119 / 469, intl. $22 / 55 / 132), legacy Coding Plan | 5-hour window remaining `GET /v1/coding_plan/remains` |
 
-Anything that can't be fetched can be typed in by hand; empty fields are simply hidden. On macOS / Linux the status-bar menu gains a **Plan · name · price · remaining** row whose submenu shows balance, remaining quota, reset time, the raw details returned by the endpoint, a **Refresh quota** action and links to the usage / pricing pages.
+Anything that can't be fetched can be typed in by hand; empty fields are simply hidden. On macOS / Linux the status-bar menu shows balance and plan on one row (**余额 ¥… · provider 剩 …**); its submenu lists the DeepSeek balance, plan name and price, remaining quota and reset time, a **Refresh quota** action and the usage page. The full details returned by the endpoint are on the settings page. The menu has one level of submenus, at most 6 rows each and 24 characters per row, so Windows / Linux trays no longer cut it off at the screen edge.
 
 ## Notes
 
 - **When notifications fire** — a task that runs to completion counts as *completed*; an error, hitting the token limit or being blocked counts as *failed*; stopping a task yourself doesn't notify. For `ask_user_question`, questions with options and plan approvals count as *needs a choice*, questions without options as *needs input*; tool approvals count as *needs approval*. Only top-level sessions are tracked — sub-agents don't get their own notifications.
-- **How spend is computed** — when signed in with a DeepSeek account, today's spend is accumulated from drops in the account balance (top-ups don't count as negative spend; the platform bills with a delay, so in `auto` the estimate stands in until the balance catches up). In parallel, it's estimated from each `provider/model` route's tokens × unit price (price sources described under `priceSource` above); the **Today's usage** submenu breaks it down per model. The ledger lives in `~/.dsh/storages/dsh-notify-tray/ledger.json` and keeps 31 days.
+- **How spend is computed** — when signed in with a DeepSeek account, today's spend is accumulated from drops in the account balance (top-ups don't count as negative spend; the platform bills with a delay, so in `auto` the estimate stands in until the balance catches up). In parallel, it's estimated from each `provider/model` route's tokens × unit price (price sources described under `priceSource` above); the **Today** submenu breaks it down per model (top 3). The ledger lives in `~/.dsh/storages/dsh-notify-tray/ledger.json` and keeps 31 days.
 - **Clicking a notification / the status-bar icon / "Open DeepSeek Harness" in the menu** — brings up the desktop app when there is one, otherwise (`dsh web`) opens the web UI in the browser. Browser notifications require granting notification permission first.
 
 ## Development

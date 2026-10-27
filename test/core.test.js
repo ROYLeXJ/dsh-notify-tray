@@ -126,19 +126,20 @@ test('view: attention beats running; title says what needs you, never money', ()
   assert.equal(v.state, 'attention')
   assert.equal(v.title, '待处理 1')
   assert.equal(v.badge, '1')
-  assert.equal(v.menu[0].label, '有 1 件事等你处理')
+  assert.equal(v.menu[0].label, '1 件事等你 · 1 个在跑')
   assert.ok(v.tooltip.includes('账户余额 ¥98.7'))
   const labels = v.menu.filter(r => !r.separator).map(r => r.label)
   assert.ok(labels.some(l => l.startsWith('待输入 · A：名字？')))
   assert.ok(labels.includes('B · 刚开始'))
   assert.ok(!labels.some(l => l.includes('A · 7 分钟')), 'a waiting session is not listed twice')
   const today = v.menu.find(r => r.id === 'today')
-  assert.equal(today.label, '今日用量 · ¥1.23')
-  assert.ok(v.menu.some(r => r.id === 'usage-page' && r.label === '查看账户用量…'), 'usage page button on the first level')
-  assert.ok(!today.children.some(r => r.id === 'usage-page'))
-  const balance = v.menu.find(r => r.label === '账户余额 ¥98.7')
-  assert.ok(balance, 'balance sits on the first level')
-  assert.ok(!today.children.some(r => r.label?.startsWith('账户余额')))
+  assert.equal(today.label, '今日 ¥1.23 · 完成 3')
+  // Balance and the usage page share one submenu.
+  const account = v.menu.find(r => r.id === 'account')
+  assert.equal(account.label, '余额 ¥98.7')
+  assert.ok(account.children.some(r => r.label === 'DeepSeek 余额 ¥98.7'))
+  assert.ok(account.children.some(r => r.id === 'usage-page' && r.label === '打开用量页…'))
+  assert.ok(!today.children.some(r => r.label?.includes('余额 ¥')))
   assert.ok(v.menu.find(r => r.id === 'recent').children.some(r => r.id === 'open:c'))
   assert.ok(!v.tooltip.includes('undefined'))
 
@@ -258,7 +259,7 @@ test('ledger: estimateDeepseek counts only routes billed to the DeepSeek balance
   assert.equal(billedToDeepseek('unknown'), false)
 })
 
-test('view: submenu rows stay short enough not to run off the screen edge', () => {
+test('view: the menu stays short and shallow enough not to run off the screen edge', () => {
   const now = 1_000_000
   const tasks = { running: 0, runningList: [], waiting: [], recent: [], today: { completed: 0, failed: 0, aborted: 0 } }
   const usage = {
@@ -269,11 +270,36 @@ test('view: submenu rows stay short enough not to run off the screen edge', () =
   }
   const plan = { name: 'Kimi', lines: [], quotaText: 'Kimi Code 5 小时滚动窗口 + 月度共享额度池；年付 ¥948；含 1M 上下文与 HighSpeed 以及更多更多说明文字', links: {}, providerName: 'Kimi' }
   const v = buildView(tasks, usage, { spendSource: 'auto' }, now, plan)
-  const subRows = v.menu.filter(r => r.children).flatMap(r => r.children)
-  for (const row of subRows) assert.ok(row.label.length <= 36, `too long: ${row.label}`)
+  for (const row of v.menu) {
+    if (row.separator) continue
+    assert.ok(row.label.length <= 28, `too long: ${row.label}`)
+    if (!row.children) continue
+    assert.ok(row.children.length <= 6, `submenu too tall: ${row.label}`)
+    for (const sub of row.children) {
+      assert.ok(!sub.children, 'one level of submenus only')
+      if (!sub.separator) assert.ok(sub.label.length <= 24, `too long: ${sub.label}`)
+    }
+  }
   const today = v.menu.find(r => r.id === 'today').children.map(r => r.label)
-  assert.ok(today.includes('deepseek-flash · 792.6万 · ¥0.94 内置价'))
-  assert.ok(today.includes('当前模型 deepseek-flash'))
-  assert.ok(!today.some(l => l.startsWith('按价格估算')), 'no duplicate estimate row when it equals the spend')
+  assert.ok(today.includes('deepseek-flash ¥0.94'))
+  assert.ok(today.includes('花费 ¥0.94 · 余额扣费'))
+  const account = v.menu.find(r => r.id === 'account')
+  assert.equal(account.label, '余额 ¥189.4')
+  assert.ok(account.children.some(r => r.label === 'Kimi'))
   assert.deepEqual(wrapText('a；b', 36), ['a；b'])
+})
+
+test('view: many tasks fold into one "还有 n 个" row; recent caps at six', () => {
+  const now = 1_000_000
+  const runningList = Array.from({ length: 8 }, (_, i) => ({ sessionId: `s${i}`, title: `任务 ${i} 的一个特别特别长的标题`, since: now }))
+  const recent = Array.from({ length: 12 }, (_, i) => ({ sessionId: `r${i}`, title: `R${i}`, kind: 'completed', at: now - i * 60_000 }))
+  const tasks = { running: 8, runningList, waiting: [], recent, today: { completed: 12, failed: 0, aborted: 0 } }
+  const usage = { tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, total: 0 }, currency: 'CNY' }
+  const v = buildView(tasks, usage, {}, now)
+  const tasksShown = v.menu.filter(r => r.id?.startsWith('open:'))
+  assert.equal(tasksShown.length, 5)
+  assert.ok(tasksShown.every(r => r.label.length <= 28))
+  assert.ok(v.menu.some(r => r.id === 'show-app' && r.label === '还有 3 个…'))
+  assert.equal(v.menu.find(r => r.id === 'recent').children.length, 6)
+  assert.ok(!v.menu.some(r => r.id === 'account'), 'no balance or plan: no account submenu')
 })
