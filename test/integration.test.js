@@ -43,6 +43,7 @@ test('host route feeds client notifications and click opens the session', async 
   assert.ok(route)
   assert.ok(routes['/notify-tray/catalog'])
   assert.ok(routes['/notify-tray/refresh'])
+  assert.ok(routes['/notify-tray/tray'], 'the settings page can bring a hidden tray icon back')
 
   const call = (url) => new Promise(resolve => {
     const res = { headers: {}, setHeader(k, v) { this.headers[k] = v }, end(body) { resolve({ status: this.statusCode, body: JSON.parse(body) }) } }
@@ -75,6 +76,9 @@ test('host route feeds client notifications and click opens the session', async 
     sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
     effect() {},
   }
+
+  const first = await call('/notify-tray/state?after=-1')
+  assert.deepEqual({ enabled: first.body.tray.enabled, hidden: first.body.tray.hidden, shown: first.body.tray.shown }, { enabled: false, hidden: false, shown: false })
 
   client.apply(cctx)
   await flush() // first poll: learns the cursor only

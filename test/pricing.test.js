@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { kindForUrl, planView, PROVIDERS, providerForRoute, quotaSpecFor, staticPriceFor } from '../lib/catalog.js'
 import { Ledger, routeOf } from '../lib/ledger.js'
-import { catalogCost, convert, describeRoute, findPiCatalogFile, loadPiCatalog, makeResolver } from '../lib/pricing.js'
+import { catalogCost, convert, describeRoute, findPiCatalogFile, globalDshDirs, loadPiCatalog, makeResolver } from '../lib/pricing.js'
 import { fetchQuota, PARSERS } from '../lib/quota.js'
 
 const PI = {
@@ -157,4 +157,26 @@ test('quota: parsers normalize each provider shape and fetchQuota reports errors
   assert.equal(denied.error, 'HTTP 401：invalid key')
   const crashed = await fetchQuota({ kind: 'generic', url: 'https://x' }, 'k', { fetchImpl: async () => { throw new Error('offline') } })
   assert.equal(crashed.error, 'offline')
+})
+
+test('pricing: web profile finds pi-ai under a global npm prefix such as ~/.npm-global', () => {
+  const home = mkdtempSync(join(tmpdir(), 'home-'))
+  const dsh = join(home, '.npm-global', 'lib', 'node_modules', '@deepseek-ai', 'dsh')
+  const dist = join(dsh, 'node_modules', '@earendil-works', 'pi-ai', 'dist')
+  mkdirSync(dist, { recursive: true })
+  writeFileSync(join(dist, 'models.generated.js'), 'export const MODELS = {}\n')
+  const dirs = globalDshDirs({}, home, '/usr/bin/node')
+  assert.ok(dirs.includes(dsh))
+  assert.equal(findPiCatalogFile(dirs), join(dist, 'models.generated.js'))
+  // npm_config_prefix wins the order.
+  assert.equal(globalDshDirs({ npm_config_prefix: '/opt/npm' }, home, '/usr/bin/node')[0], join('/opt/npm', 'lib', 'node_modules', '@deepseek-ai', 'dsh'))
+})
+
+test('pricing: a pi-ai hoisted next to the dsh package is found too', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hoist-'))
+  const dist = join(root, 'lib', 'node_modules', '@earendil-works', 'pi-ai', 'dist')
+  mkdirSync(dist, { recursive: true })
+  mkdirSync(join(root, 'lib', 'node_modules', '@deepseek-ai', 'dsh'), { recursive: true })
+  writeFileSync(join(dist, 'models.generated.js'), 'export const MODELS = {}\n')
+  assert.equal(findPiCatalogFile([join(root, 'lib', 'node_modules', '@deepseek-ai', 'dsh')]), join(dist, 'models.generated.js'))
 })
