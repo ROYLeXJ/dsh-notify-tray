@@ -63,7 +63,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.4
 
 ## 设置
 
-所有选项都可以在 DSH「插件 → 小鲸鱼通知站 → 配置」里修改，也可以写在 profile 的 `cordis.patch.yml` 里：
+所有选项都可以在 DSH「插件 → 小鲸鱼通知站」页里修改，也可以写在 profile 的 `cordis.patch.yml` 里。设置页首屏只有常用的几项（通知勾选、提示音、状态栏小鲸鱼、今日花费卡片、我的套餐和额度查询）；通知通道、花费算法、自定义单价、汇率、各种刷新间隔都在页面底部的「高级设置」里，默认折叠，改过的项会标「已改 n 项」。
 
 ```yaml
 - id: notify-tray
@@ -136,12 +136,12 @@ dsh plugin --profile web add dsh-notify-tray@0.1.4
 | GPT | ChatGPT Go / Plus / Pro 5x / Pro 20x / Business、API 按量 | 普通 Key 无接口 |
 | MiniMax | M Plan Go / Explore / Build（国内 ¥49 / 119 / 469，国际 $22 / 55 / 132）、旧版 Coding Plan | 5 小时窗口剩余 `GET /v1/coding_plan/remains` |
 
-拿不到的信息就手填；留空也可以，留空的项不显示。macOS / Linux 的状态栏菜单里会多一行「套餐 · 名称 · 价格 · 剩余」，子菜单里有余额、剩余额度、重置时间、接口返回的明细、「刷新额度」和用量页 / 价格页链接。
+拿不到的信息就手填；留空也可以，留空的项不显示。macOS / Linux 的状态栏菜单里，余额和套餐合在一行「余额 ¥… · 平台 剩 …」，子菜单里有 DeepSeek 余额、套餐名和价格、剩余额度和重置时间、「刷新额度」和用量页链接；接口返回的完整明细在设置页里看。状态栏菜单只有一层子菜单，每个最多 6 行、每行不超过 24 个字，在 Windows / Linux 托盘里也不会被屏幕边缘截断。
 
 ## 说明
 
 - **通知的触发时机**：任务跑完算「完成」；出错、超出 Token 上限、被拦截算「失败」；你自己点停止不弹通知。调用 `ask_user_question` 时，带选项的问题和计划审批算「需要选择」，不带选项的算「需要输入」；工具审批算「需要批准」。只跟踪顶层会话，子 agent 不单独弹通知。
-- **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费；平台扣费有延迟，`auto` 下余额没跟上时先按估算显示）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日用量」子菜单里按模型分行显示。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
+- **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费；平台扣费有延迟，`auto` 下余额没跟上时先按估算显示）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日」子菜单里按模型分行显示（最多 3 个模型）。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
 - **点击通知 / 状态栏图标 / 菜单里的「打开 DeepSeek Harness」**：有桌面版时唤起桌面版，没有时（`dsh web`）在浏览器里打开 Web 界面。浏览器里的通知需要先允许通知权限。
 
 ## 已知限制

@@ -49,7 +49,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test --test-force-exit test/"
+    "test": "node --test --test-force-exit test/*.test.js"
   },
   "dsh": {
     "bundle": {
