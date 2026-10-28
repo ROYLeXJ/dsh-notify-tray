@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { kindForUrl, planView, PROVIDERS, providerForRoute, quotaSpecFor, staticPriceFor } from '../lib/catalog.js'
+import { isDeepseekOffPeak, kindForUrl, planView, PROVIDERS, providerForRoute, quotaSpecFor, staticPriceFor } from '../lib/catalog.js'
 import { Ledger, routeOf } from '../lib/ledger.js'
-import { catalogCost, convert, describeRoute, findPiCatalogFile, globalDshDirs, loadPiCatalog, makeResolver } from '../lib/pricing.js'
+import { catalogCost, convert, describeRoute, findDshVersion, findPiCatalogFile, globalDshDirs, loadPiCatalog, makeResolver, npmGlobalDshDir } from '../lib/pricing.js'
 import { fetchQuota, PARSERS } from '../lib/quota.js'
 
 const PI = {
@@ -179,4 +179,62 @@ test('pricing: a pi-ai hoisted next to the dsh package is found too', () => {
   mkdirSync(join(root, 'lib', 'node_modules', '@deepseek-ai', 'dsh'), { recursive: true })
   writeFileSync(join(dist, 'models.generated.js'), 'export const MODELS = {}\n')
   assert.equal(findPiCatalogFile([join(root, 'lib', 'node_modules', '@deepseek-ai', 'dsh')]), join(dist, 'models.generated.js'))
+})
+
+test('deepseek: off-peak is outside 9–12 and 14–18 Beijing time on weekdays, weekends all day', () => {
+  // 2026-10-28 is a Wednesday. Beijing = UTC+8.
+  const at = (iso) => Date.parse(iso)
+  assert.equal(isDeepseekOffPeak(at('2026-10-28T01:30:00Z')), false, '09:30 Beijing, peak')
+  assert.equal(isDeepseekOffPeak(at('2026-10-28T04:30:00Z')), true, '12:30 Beijing, lunch')
+  assert.equal(isDeepseekOffPeak(at('2026-10-28T09:59:00Z')), false, '17:59 Beijing, peak')
+  assert.equal(isDeepseekOffPeak(at('2026-10-28T10:00:00Z')), true, '18:00 Beijing, evening')
+  assert.equal(isDeepseekOffPeak(at('2026-10-27T17:00:00Z')), true, '01:00 Beijing')
+  assert.equal(isDeepseekOffPeak(at('2026-10-31T02:00:00Z')), true, 'Saturday 10:00 Beijing')
+})
+
+test('deepseek: listed prices are discounted for off-peak tokens, typed prices are not', () => {
+  let now = Date.parse('2026-10-28T02:00:00Z') // 10:00 Beijing, peak
+  const l = new Ledger({ now: () => now })
+  const s = { id: 's1', header: {} }
+  const ev = (type, data) => ({ type, data })
+  l.sessionEvent(s, ev('request/header', { header: { config: { provider: 'deepseek-account', model: 'deepseek-flash' } } }))
+  l.sessionEvent(s, ev('assistant/message', { turn: 1, step: 0, usage: { inputTokens: 1_000_000, outputTokens: 0 } }))
+  now = Date.parse('2026-10-28T12:00:00Z') // 20:00 Beijing, off-peak
+  l.sessionEvent(s, ev('assistant/message', { turn: 2, step: 0, usage: { inputTokens: 1_000_000, outputTokens: 0 } }))
+  const cfg = { currency: 'CNY', prices: {} }
+  const listed = l.summary(makeResolver({ cfg }), 'CNY')
+  assert.equal(listed.byModel[0].source, 'static')
+  assert.equal(listed.estimate, 2 + 1, '¥2 peak + ¥1 off-peak')
+  const typed = l.summary(makeResolver({ cfg: { ...cfg, customInput: 2, customOutput: 8 } }), 'CNY')
+  assert.equal(typed.estimate, 4, 'a price the user typed is taken as it is')
+  const kimi = makeResolver({ cfg })('kimi-coding/kimi-for-coding')
+  assert.equal(kimi.offPeakFactor, undefined, 'only DeepSeek routes')
+  const described = describeRoute({ cfg, route: { provider: 'deepseek-account', model: 'deepseek-flash' }, now })
+  assert.deepEqual([described.effective.offPeakFactor, described.effective.offPeakNow], [0.5, true])
+})
+
+test('pricing: global dirs cover Windows npm, nvm, fnm, volta and pnpm homes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-vm-'))
+  const home = join(root, 'home')
+  mkdirSync(join(home, '.nvm', 'versions', 'node', 'v22.1.0'), { recursive: true })
+  mkdirSync(join(home, '.local', 'share', 'fnm', 'node-versions', 'v20.9.0'), { recursive: true })
+  const dsh = join('@deepseek-ai', 'dsh')
+  const dirs = globalDshDirs({ APPDATA: join(root, 'AppData', 'Roaming') }, home, '/usr/bin/node')
+  assert.ok(dirs.includes(join(root, 'AppData', 'Roaming', 'npm', 'node_modules', dsh)), 'npm on Windows')
+  assert.ok(dirs.includes(join(home, '.nvm', 'versions', 'node', 'v22.1.0', 'lib', 'node_modules', dsh)), 'nvm')
+  assert.ok(dirs.includes(join(home, '.local', 'share', 'fnm', 'node-versions', 'v20.9.0', 'installation', 'lib', 'node_modules', dsh)), 'fnm')
+  assert.ok(dirs.includes(join(home, '.volta', 'tools', 'image', 'packages', dsh, 'lib', 'node_modules', dsh)), 'volta')
+})
+
+test('pricing: npm root -g is the last resort, and the dsh version is read from its package.json', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-npmroot-'))
+  const fake = (out, error) => (file, args, options, done) => done(error, out)
+  assert.equal(await npmGlobalDshDir({ run: fake(`${root}\n`) }), join(root, '@deepseek-ai', 'dsh'))
+  assert.equal(await npmGlobalDshDir({ run: fake('', new Error('no npm')) }), undefined)
+  const pkg = join(root, 'node_modules', '@deepseek-ai', 'dsh')
+  mkdirSync(join(pkg, 'dist'), { recursive: true })
+  writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.3.0' }))
+  assert.equal(findDshVersion([join(pkg, 'dist')]), '0.3.0', 'from inside the package')
+  assert.equal(findDshVersion([join(root, 'project')]), '0.3.0', 'from a node_modules on the way up')
+  assert.equal(findDshVersion([mkdtempSync(join(tmpdir(), 'dsh-none-'))]), undefined)
 })
