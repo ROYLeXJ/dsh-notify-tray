@@ -135,6 +135,36 @@ test('host route feeds client notifications and click opens the session', async 
   assert.ok(catalog.providers.some(p => p.id === 'kimi' && p.plans.some(x => x.id === 'cn-pro')))
 })
 
+test('windows: a window that comes forward after a toast opens the toast\'s session, once', async () => {
+  const { apply } = await import('../lib/index.js')
+  const real = Object.getOwnPropertyDescriptor(process, 'platform')
+  Object.defineProperty(process, 'platform', { ...real, value: 'win32' })
+  try {
+    const ctx = fakeCtx()
+    const routes = {}
+    ctx.services.webServer = { register: r => { routes[r.path] = r; return () => {} } }
+    ctx.services.connection = { requestRejection: () => undefined }
+    apply(ctx, {
+      notifyCompleted: vol(true), notifyFailed: vol(true), notifyApproval: vol(true), notifyChoice: vol(true), notifyInput: vol(true),
+      channel: vol('system'), suppressWhenFocused: vol(true), sound: vol(false), tray: vol(false),
+      spendSource: vol('auto'), currency: vol('CNY'), balancePollMinutes: vol(5), prices: vol({}), errorHoldMinutes: vol(10),
+      priceSource: vol('auto'), planProvider: vol('none'), planAutoQuota: vol(false), quotaPollMinutes: vol(10),
+    })
+    assert.ok(routes['/notify-tray/raise'], 'in-window clicks can ask the host to raise the window')
+    const call = url => new Promise(resolve => {
+      const res = { headers: {}, setHeader(k, v) { this.headers[k] = v }, end(body) { resolve(JSON.parse(body)) } }
+      routes['/notify-tray/state'].handler({ method: 'GET', url }, res)
+    })
+    const session = { id: 'W1', header: { cwd: '/w/demo' } }
+    ctx.emit('session/event', session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+    assert.deepEqual((await call('/notify-tray/state?after=-1')).focus, [], 'a poll that did not just gain focus claims nothing')
+    assert.deepEqual((await call('/notify-tray/state?after=-1&claim=1')).focus, ['W1'])
+    assert.deepEqual((await call('/notify-tray/state?after=-1&claim=1')).focus, [], 'claimed once')
+  } finally {
+    Object.defineProperty(process, 'platform', real)
+  }
+})
+
 test.after(() => {
   // Host effects keep timers alive (ledger flush); dispose like cordis would.
   setTimeout(() => process.exit(0), 50).unref()

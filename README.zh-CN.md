@@ -104,7 +104,7 @@ dsh plugin --profile web add dsh-notify-tray@0.1.5
 | `exchangeRate` | `7.2` | 1 美元 = ? 人民币；目录价是美元，显示人民币时按它换算 |
 | `prices` | `{}` | 按模型的价格表，优先级最高 |
 
-「当前 API 价格」区域会显示你正在用的模型（provider / model）和它的目录价：DSH 的 pi-ai 适配器自带一份模型目录（Claude、GPT、Gemini、Grok、Groq、Kimi、GLM、MiMo、MiniMax、OpenCode Go、DeepSeek 等），插件直接读它，拿不到的再用内置价或你填的自定义价。桌面版和 `dsh web`（含 `~/.npm-global` 等全局 npm 安装）都会自动找到这份目录；如果设置页提示没找到，可以设置环境变量 `DSH_NOTIFY_TRAY_PI_AI` 指向 DSH 的安装目录（例如 `~/.npm-global/lib/node_modules/@deepseek-ai/dsh`）后重启。一键「把目录价填进自定义价」可以在目录价的基础上改。
+「当前 API 价格」区域会显示你正在用的模型（provider / model）和它的目录价：DSH 的 pi-ai 适配器自带一份模型目录（Claude、GPT、Gemini、Grok、Groq、Kimi、GLM、MiMo、MiniMax、OpenCode Go、DeepSeek 等），插件直接读它，拿不到的再用内置价或你填的自定义价。桌面版和 `dsh web` 都会自动找到这份目录（全局 npm 安装如 `~/.npm-global`、Windows 的 `%APPDATA%\npm`，pnpm，以及 nvm / fnm / volta 装的 node；实在找不到时会问一次 `npm root -g`）。启动时没找到的话，插件每 10 分钟再找一次。如果设置页仍提示没找到，可以设置环境变量 `DSH_NOTIFY_TRAY_PI_AI` 指向 DSH 的安装目录（例如 `~/.npm-global/lib/node_modules/@deepseek-ai/dsh`）后重启。一键「把目录价填进自定义价」可以在目录价的基础上改。
 
 ### 套餐
 
@@ -142,7 +142,11 @@ dsh plugin --profile web add dsh-notify-tray@0.1.5
 
 - **通知的触发时机**：任务跑完算「完成」；出错、超出 Token 上限、被拦截算「失败」；你自己点停止不弹通知。调用 `ask_user_question` 时，带选项的问题和计划审批算「需要选择」，不带选项的算「需要输入」；工具审批算「需要批准」。只跟踪顶层会话，子 agent 不单独弹通知。
 - **花费怎么算**：用 DeepSeek 账户登录时，按账户余额的下降累计当天花费（充值不算负花费；平台扣费有延迟，`auto` 下余额没跟上时先按估算显示）；同时按当天各「provider/model」的 Token 乘以单价估算（单价来源见上面的 `priceSource`），「今日」子菜单里按模型分行显示（最多 3 个模型）。账本存在 `~/.dsh/storages/dsh-notify-tray/ledger.json`，保留 31 天。
+- **DeepSeek 空闲时段价格**：DeepSeek 的标价是高峰价（北京时间工作日 9–12、14–18 点），其余时间用的 token 按半价估算；你自己填的价（价格表或自定义价）按原样算。
 - **点击通知 / 状态栏图标 / 菜单里的「打开 DeepSeek Harness」**：有桌面版时唤起桌面版，没有时（`dsh web`）在浏览器里打开 Web 界面。浏览器里的通知需要先允许通知权限。
+  - 默认的 `channel: auto` 下，只要开着 DSH 窗口，通知就由窗口弹，三个系统上点击都能跳到对应会话。
+  - **macOS 系统通知**（`dsh web` 或 `channel: system`）用 `osascript` 发，点击时没法告诉 DSH 是哪个会话。装上 [terminal-notifier](https://github.com/julienXX/terminal-notifier)（`brew install terminal-notifier`）后插件会自动改用它，点通知就能打开对应会话。
+  - **Windows 系统通知**只能唤起应用，所以通知弹出后一分钟内被拉到前面的窗口，会打开这条通知对应的会话。Windows 不允许后台进程把被别的窗口挡住的*可见*窗口拉到最前（见 [#4](https://github.com/ROYLeXJ/dsh-notify-tray/issues/4)）；最小化的窗口会被恢复。
 
 ## 已知限制
 
