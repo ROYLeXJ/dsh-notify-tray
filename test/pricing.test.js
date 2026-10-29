@@ -238,3 +238,54 @@ test('pricing: npm root -g is the last resort, and the dsh version is read from 
   assert.equal(findDshVersion([join(root, 'project')]), '0.3.0', 'from a node_modules on the way up')
   assert.equal(findDshVersion([mkdtempSync(join(tmpdir(), 'dsh-none-'))]), undefined)
 })
+
+test('pricing: models.dev snapshot prices models neither pi-ai nor the static catalog know', async () => {
+  const { modelsDevCost, modelsDevModels } = await import('../lib/pricing.js')
+  const models = modelsDevModels()
+  assert.ok(Object.keys(models).includes('anthropic'), 'the snapshot ships with the plugin')
+  const fake = { groq: { 'llama-x': { name: 'Llama X', input: 0.5, output: 1 } } }
+  assert.deepEqual(modelsDevCost('groq', 'llama-x', fake), { input: 0.5, cacheRead: 0.5, cacheWrite: 0.5, output: 1, currency: 'USD', name: 'Llama X', provider: 'groq' })
+  assert.equal(modelsDevCost('some-router', 'llama-x', fake).input, 0.5, 'a model id is found under any provider')
+  assert.equal(modelsDevCost('groq', 'nope', fake), undefined)
+  // Through the resolver: pi-ai absent, static catalog silent → models.dev, converted to CNY.
+  const [provider, model] = Object.entries(models)
+    .flatMap(([p, rows]) => Object.keys(rows).map(m => [p, m]))
+    .find(([p, m]) => !staticPriceFor(p, m))
+  const hit = makeResolver({ cfg: { currency: 'CNY', exchangeRate: 7 }, models: undefined })(`${provider}/${model}`)
+  assert.equal(hit.source, 'modelsDev')
+  assert.equal(hit.price.input, Math.round(models[provider][model].input * 7 * 1e6) / 1e6)
+})
+
+test('quota: a fetch plan falls back from the saved key to the env var and records every attempt', async () => {
+  const { failureHint, runQuotaPlan } = await import('../lib/quota.js')
+  const calls = []
+  const reading = await runQuotaPlan([
+    { id: 'saved', label: 'DSH 保存的 Key', available: async () => true, fetch: async () => { calls.push('saved'); return { ok: false, at: 1, error: 'HTTP 401：invalid', status: 401 } } },
+    { id: 'env', label: '环境变量', available: () => true, fetch: async () => { calls.push('env'); return { ok: true, at: 2, data: { percent: 40 } } } },
+  ])
+  assert.deepEqual(calls, ['saved', 'env'])
+  assert.equal(reading.ok, true)
+  assert.deepEqual(reading.attempts.map(a => [a.id, a.outcome]), [['saved', 'failed'], ['env', 'ok']])
+  assert.match(reading.attempts[0].hint, /Key 不对/)
+
+  const none = await runQuotaPlan([
+    { id: 'saved', label: 'DSH 保存的 Key', available: async () => '没有保存 KIMI', fetch: async () => assert.fail('not available') },
+    { id: 'env', label: '环境变量', available: () => '没有设置 KIMI', fetch: async () => assert.fail('not available') },
+  ], { now: () => 5, noneError: '没找到 API Key' })
+  assert.deepEqual([none.ok, none.at, none.error], [false, 5, '没找到 API Key'])
+  assert.deepEqual(none.attempts.map(a => a.outcome), ['skipped', 'skipped'])
+
+  const stop = await runQuotaPlan([
+    { id: 'a', label: 'A', available: () => true, fetch: async () => ({ ok: false, at: 1, error: 'x' }), fallback: () => false },
+    { id: 'b', label: 'B', available: () => true, fetch: async () => assert.fail('a said not to fall back') },
+  ])
+  assert.equal(stop.attempts.length, 1)
+  assert.equal(failureHint({ error: '请求超时' }), '连不上查询接口，检查网络或代理')
+  assert.equal(failureHint({ error: 'weird' }), undefined)
+})
+
+test('quota: fetchQuota keeps the HTTP status of a failure', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 403, text: async () => '{"message":"forbidden"}' })
+  const reading = await fetchQuota({ url: 'https://x', kind: 'generic' }, 'k', { fetchImpl, now: () => 1 })
+  assert.deepEqual(reading, { ok: false, at: 1, error: 'HTTP 403：forbidden', status: 403 })
+})
