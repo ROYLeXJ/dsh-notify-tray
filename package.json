@@ -50,7 +50,8 @@
   },
   "scripts": {
     "test": "node --test --test-force-exit test/*.test.js",
-    "version": "node scripts/sync-readme-version.mjs && git add README.md README.zh-CN.md"
+    "version": "node scripts/sync-readme-version.mjs && git add README.md README.zh-CN.md",
+    "update-prices": "node scripts/update-models-dev.mjs"
   },
   "dsh": {
     "bundle": {

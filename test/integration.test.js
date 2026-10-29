@@ -97,6 +97,7 @@ test('host route feeds client notifications and click opens the session', async 
   assert.ok(shown.every(n => n.opts.body.includes('『写周报』')))
   assert.equal(shown.length, 3)
   assert.ok(shown[2].opts.body.includes('网络错误'))
+  assert.ok(shown.every(n => n.opts.tag === 'dsh-notify-tray:S1'), 'one notification per session: same tag replaces')
 
   // No duplicates on the next poll; a click opens the session.
   await tick()
@@ -163,6 +164,39 @@ test('windows: a window that comes forward after a toast opens the toast\'s sess
   } finally {
     Object.defineProperty(process, 'platform', real)
   }
+})
+
+test('lite polls skip the money snapshot; the settings page gets `unchanged` for a rev it holds; answered questions are taken back', async () => {
+  const { apply } = await import('../lib/index.js')
+  const ctx = fakeCtx()
+  const routes = {}
+  ctx.services.webServer = { register: r => { routes[r.path] = r; return () => {} } }
+  ctx.services.connection = { requestRejection: () => undefined }
+  apply(ctx, {
+    notifyCompleted: vol(true), notifyFailed: vol(true), notifyApproval: vol(true), notifyChoice: vol(true), notifyInput: vol(true),
+    channel: vol('client'), suppressWhenFocused: vol(false), sound: vol(false), tray: vol(false),
+    spendSource: vol('auto'), currency: vol('CNY'), balancePollMinutes: vol(5), prices: vol({}), errorHoldMinutes: vol(10),
+    priceSource: vol('auto'), planProvider: vol('none'), planAutoQuota: vol(false), quotaPollMinutes: vol(10),
+  })
+  const call = url => new Promise(resolve => {
+    const res = { headers: {}, setHeader(k, v) { this.headers[k] = v }, end(body) { resolve(JSON.parse(body)) } }
+    routes['/notify-tray/state'].handler({ method: 'GET', url }, res)
+  })
+  const lite = await call('/notify-tray/state?lite=1&after=-1')
+  assert.deepEqual(Object.keys(lite).sort(), ['boot', 'events', 'focus', 'seq', 'suppressWhenFocused', 'titles'])
+  const full = await call('/notify-tray/state?after=-2')
+  assert.ok(full.rev && full.usage && full.summary)
+  const again = await call(`/notify-tray/state?after=-2&rev=${full.rev}`)
+  assert.deepEqual([again.unchanged, again.usage], [true, undefined])
+
+  const session = { id: 'Q1', header: { cwd: '/w/demo' } }
+  ctx.emit('session/event', session, { type: 'tool/call', data: { callId: 'c1', name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ question: '标题？' }] }) } })
+  const changed = await call(`/notify-tray/state?after=-2&rev=${full.rev}`)
+  assert.equal(changed.unchanged, undefined, 'a session now waits: new snapshot')
+  ctx.emit('session/event', session, { type: 'tool/result', data: { message: { toolCallId: 'c1' } } })
+  const { events } = await call(`/notify-tray/state?lite=1&after=${lite.seq}`)
+  assert.deepEqual(events.map(e => [e.kind, e.type, e.key]), [['show', 'input', 'Q1'], ['withdraw', undefined, 'Q1']])
+  assert.ok(events[0].display.title.startsWith('🐳 '))
 })
 
 test.after(() => {
